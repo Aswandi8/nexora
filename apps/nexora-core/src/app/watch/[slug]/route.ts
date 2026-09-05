@@ -53,6 +53,12 @@ function getPublicOrigin(request: Request): string {
   }
 }
 
+function isXCardCrawler(request: Request): boolean {
+  const userAgent = request.headers.get("user-agent") ?? "";
+
+  return /Twitterbot/i.test(userAgent);
+}
+
 export async function GET(request: Request, context: WatchRouteContext) {
   const { slug } = await context.params;
 
@@ -90,6 +96,10 @@ export async function GET(request: Request, context: WatchRouteContext) {
         "X-Content-Type-Options": "nosniff",
       },
     });
+  }
+
+  if (!isXCardCrawler(request)) {
+    return Response.redirect(shortlink.destinationUrl, 302);
   }
 
   const publicOrigin = getPublicOrigin(request);

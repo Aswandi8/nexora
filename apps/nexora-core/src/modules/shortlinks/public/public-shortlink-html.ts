@@ -58,108 +58,6 @@ function getGeneratedPosterUrl(
   return url.toString();
 }
 
-function getVideoPosterUrl(
-  posterUrl: string | null,
-  canonicalUrl: string,
-  updatedAt: string,
-): string {
-  return posterUrl ?? getGeneratedPosterUrl(canonicalUrl, updatedAt);
-}
-
-function formatDisplayDuration(durationMs: number): string {
-  const totalSeconds = Math.floor(durationMs / 1000);
-
-  const minutes = Math.floor(totalSeconds / 60);
-
-  const seconds = totalSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function renderPlayButton(): string {
-  return `
-    <div class="play-button" aria-hidden="true">
-      <span></span>
-    </div>
-  `;
-}
-
-function renderDisplayDuration(displayDurationMs: number): string {
-  return `
-    <div class="duration">
-      ${escapeHtml(formatDisplayDuration(displayDurationMs))}
-    </div>
-  `;
-}
-
-function renderImageMedia(
-  mediaUrl: string,
-  destinationUrl: string,
-  title: string,
-  width: number,
-  height: number,
-  displayDurationMs: number,
-): string {
-  return `
-    <a
-      class="media-link"
-      href="${escapeAttribute(destinationUrl)}"
-      rel="noopener noreferrer"
-      aria-label="${escapeAttribute(title)}"
-    >
-      <div class="media-frame">
-        <img
-          class="media"
-          src="${escapeAttribute(mediaUrl)}"
-          alt="${escapeAttribute(title)}"
-          width="${width}"
-          height="${height}"
-        >
-
-        ${renderPlayButton()}
-
-        ${renderDisplayDuration(displayDurationMs)}
-      </div>
-    </a>
-  `;
-}
-
-function renderVideoMedia(
-  mediaUrl: string,
-  posterUrl: string,
-  destinationUrl: string,
-  title: string,
-  width: number,
-  height: number,
-  displayDurationMs: number,
-): string {
-  return `
-    <a
-      class="media-link"
-      href="${escapeAttribute(destinationUrl)}"
-      rel="noopener noreferrer"
-      aria-label="${escapeAttribute(title)}"
-    >
-      <div class="media-frame">
-        <video
-          class="media"
-          src="${escapeAttribute(mediaUrl)}"
-          poster="${escapeAttribute(posterUrl)}"
-          width="${width}"
-          height="${height}"
-          preload="metadata"
-          muted
-          playsinline
-        ></video>
-
-        ${renderPlayButton()}
-
-        ${renderDisplayDuration(displayDurationMs)}
-      </div>
-    </a>
-  `;
-}
-
 export function renderPublicShortlinkHtml({
   shortlink,
   canonicalUrl,
@@ -172,8 +70,6 @@ export function renderPublicShortlinkHtml({
 
   const mediaUrl = normalizePublicHttpUrl(shortlink.mediaUrl);
 
-  const storedPosterUrl = normalizePublicHttpUrl(shortlink.posterUrl);
-
   if (!destinationUrl) {
     throw new Error("INVALID_PUBLIC_SHORTLINK_DESTINATION");
   }
@@ -182,70 +78,10 @@ export function renderPublicShortlinkHtml({
     throw new Error("INVALID_PUBLIC_SHORTLINK_MEDIA_URL");
   }
 
-  const videoPosterUrl =
-    shortlink.mediaType === "VIDEO"
-      ? getVideoPosterUrl(storedPosterUrl, canonicalUrl, shortlink.updatedAt)
-      : null;
-
-  const socialImageUrl =
-    shortlink.mediaType === "IMAGE" ? mediaUrl : videoPosterUrl;
-
-  const mediaMarkup =
-    shortlink.mediaType === "IMAGE"
-      ? renderImageMedia(
-          mediaUrl,
-          destinationUrl,
-          title,
-          shortlink.mediaWidth,
-          shortlink.mediaHeight,
-          shortlink.displayDurationMs,
-        )
-      : renderVideoMedia(
-          mediaUrl,
-          videoPosterUrl!,
-          destinationUrl,
-          title,
-          shortlink.mediaWidth,
-          shortlink.mediaHeight,
-          shortlink.displayDurationMs,
-        );
-
-  const openGraphMedia =
-    shortlink.mediaType === "IMAGE"
-      ? [
-          metaProperty("og:image", mediaUrl),
-
-          metaProperty("og:image:secure_url", mediaUrl),
-
-          metaProperty("og:image:type", shortlink.mimeType),
-
-          metaProperty("og:image:width", String(shortlink.mediaWidth)),
-
-          metaProperty("og:image:height", String(shortlink.mediaHeight)),
-
-          metaProperty("og:image:alt", title),
-        ].join("\n")
-      : [
-          metaProperty("og:image", videoPosterUrl),
-
-          metaProperty("og:image:secure_url", videoPosterUrl),
-
-          metaProperty("og:image:width", String(shortlink.mediaWidth)),
-
-          metaProperty("og:image:height", String(shortlink.mediaHeight)),
-
-          metaProperty("og:image:alt", title),
-
-          metaProperty("og:video", mediaUrl),
-
-          metaProperty("og:video:secure_url", mediaUrl),
-
-          metaProperty("og:video:type", shortlink.mimeType),
-
-          metaProperty("og:video:width", String(shortlink.mediaWidth)),
-
-          metaProperty("og:video:height", String(shortlink.mediaHeight)),
-        ].join("\n");
+  const socialImageUrl = getGeneratedPosterUrl(
+    canonicalUrl,
+    shortlink.updatedAt,
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -263,21 +99,28 @@ export function renderPublicShortlinkHtml({
 
   <link
     rel="canonical"
-    href="${escapeAttribute(canonicalUrl)}"
+    href="${escapeAttribute(destinationUrl)}"
   >
 
-  ${metaProperty(
-    "og:type",
-    shortlink.mediaType === "VIDEO" ? "video.other" : "website",
-  )}
+  ${metaProperty("og:type", "website")}
 
-  ${metaProperty("og:url", canonicalUrl)}
+  ${metaProperty("og:url", destinationUrl)}
 
   ${metaProperty("og:title", title)}
 
   ${metaProperty("og:description", description)}
 
-  ${openGraphMedia}
+  ${metaProperty("og:image", socialImageUrl)}
+
+  ${metaProperty("og:image:secure_url", socialImageUrl)}
+
+  ${metaProperty("og:image:type", "image/jpeg")}
+
+  ${metaProperty("og:image:width", "1200")}
+
+  ${metaProperty("og:image:height", "675")}
+
+  ${metaProperty("og:image:alt", title)}
 
   ${metaName("twitter:card", "summary_large_image")}
 
@@ -287,107 +130,13 @@ export function renderPublicShortlinkHtml({
 
   ${metaName("twitter:image", socialImageUrl)}
 
-  ${metaName("twitter:image:alt", socialImageUrl ? title : null)}
-
-  <style>
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      margin: 0;
-      min-height: 100%;
-      background: #000;
-    }
-
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-
-    .page {
-      width: 100%;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .media-link {
-      display: block;
-      width: min(
-        100%,
-        ${shortlink.mediaWidth}px
-      );
-      text-decoration: none;
-      cursor: pointer;
-    }
-
-    .media-frame {
-      position: relative;
-      width: 100%;
-    }
-
-    .media {
-      display: block;
-      width: 100%;
-      height: auto;
-      max-height: 100vh;
-      object-fit: contain;
-      background: #000;
-    }
-
-    .play-button {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 72px;
-      height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 9999px;
-      background: rgba(0, 0, 0, 0.7);
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-    }
-
-    .play-button span {
-      display: block;
-      width: 0;
-      height: 0;
-      margin-left: 6px;
-      border-top: 13px solid transparent;
-      border-bottom: 13px solid transparent;
-      border-left: 21px solid #fff;
-    }
-
-    .duration {
-      position: absolute;
-      right: 12px;
-      bottom: 12px;
-      padding: 5px 8px;
-      border-radius: 6px;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.78);
-      font-size: 13px;
-      font-weight: 600;
-      line-height: 1;
-      pointer-events: none;
-    }
-  </style>
+  ${metaName("twitter:image:alt", title)}
 </head>
 
 <body>
-  <main class="page">
-    ${mediaMarkup}
-  </main>
+  <a href="${escapeAttribute(destinationUrl)}">
+    ${escapeHtml(title)}
+  </a>
 </body>
 </html>`;
 }
