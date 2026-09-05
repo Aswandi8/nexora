@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Nexora
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/nexora_ci?sslmode=disable
+
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: nexora-ci-only-secret-not-for-production
+      NEXORA_CONSOLE_URL: http://localhost:3001
+
+      NEXORA_CORE_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          version: 11.24.0
+          runtime: node@24.19.0
+          cache: true
+          install: false
+
+      - name: Verify toolchain
+        run: |
+          node --version
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Typecheck and lint
+        run: pnpm check
+
+      - name: Build Core
+        run: pnpm build:core
+
+      - name: Build Console
+        run: pnpm build:console

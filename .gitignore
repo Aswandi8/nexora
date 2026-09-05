@@ -1,0 +1,26 @@
+﻿# Workspace dependencies
+node_modules/
+
+# Workspace build artifacts
+*.tsbuildinfo
+coverage/
+dist/
+.cache/
+
+# Database backups
+/backups/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Sensitive local/debug artifacts
+*cookies*.txt
+login-body*.json
+*.har
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
