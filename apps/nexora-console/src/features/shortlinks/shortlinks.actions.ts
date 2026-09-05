@@ -2,6 +2,7 @@
 
 import {
   createShortlinkSchema,
+  shortlinkStatusSchema,
   updateShortlinkSchema,
   type CreateShortlinkInput,
   type UpdateShortlinkInput,
@@ -61,6 +62,36 @@ export async function updateShortlinkAction(
     };
   } catch (error) {
     return actionFailure(error, "Unable to update shortlink.");
+  }
+}
+
+export async function updateShortlinkStatusAction(
+  id: string,
+  status: unknown,
+): Promise<ShortlinkActionResult> {
+  try {
+    const parsedStatus = shortlinkStatusSchema.parse(status);
+
+    const data = updateShortlinkSchema.parse({
+      status: parsedStatus,
+    });
+
+    await serverApiRequest(`/api/shortlinks/${id}`, {
+      method: "PATCH",
+      body: data,
+      cache: "no-store",
+    });
+
+    revalidatePath("/shortlinks");
+    revalidatePath(`/shortlinks/${id}`);
+    revalidatePath(`/shortlinks/${id}/edit`);
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    return actionFailure(error, "Unable to update shortlink status.");
   }
 }
 

@@ -3,7 +3,6 @@
 import {
   createShortlinkSchema,
   type Shortlink,
-  type ShortlinkMediaType,
   type ShortlinkStatus,
   type UpdateShortlinkInput,
 } from "@nexora/contracts";
@@ -17,7 +16,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-
 import {
   Select,
   SelectContent,
@@ -25,23 +23,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
-
 import { useToast } from "@/hooks/use-toast";
 
 import {
   createShortlinkAction,
   updateShortlinkAction,
 } from "../shortlinks.actions";
-
 import {
   displayDurationMsToParts,
   durationPartsToMs,
-  formatShortlinkDuration,
 } from "../shortlink.utils";
-
 import { DurationInput } from "./duration-input";
 import { ShortlinkPreview } from "./shortlink-preview";
 
@@ -51,9 +44,7 @@ interface ShortlinkFormProps {
 
 export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
   const router = useRouter();
-
   const { toast } = useToast();
-
   const isEditing = Boolean(shortlink);
 
   const initialDuration = displayDurationMsToParts(
@@ -61,45 +52,28 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
   );
 
   const [slug, setSlug] = useState(shortlink?.slug ?? "");
-
   const [destinationUrl, setDestinationUrl] = useState(
     shortlink?.destinationUrl ?? "",
   );
-
   const [title, setTitle] = useState(shortlink?.title ?? "");
-
   const [description, setDescription] = useState(shortlink?.description ?? "");
-
-  const [mediaType, setMediaType] = useState<ShortlinkMediaType>(
-    shortlink?.mediaType ?? "IMAGE",
-  );
-
   const [mediaUrl, setMediaUrl] = useState(shortlink?.mediaUrl ?? "");
-
-  const [posterUrl, setPosterUrl] = useState(shortlink?.posterUrl ?? "");
-
   const [durationMinutes, setDurationMinutes] = useState(
     initialDuration.minutes,
   );
-
   const [durationSeconds, setDurationSeconds] = useState(
     initialDuration.seconds,
   );
-
   const [status, setStatus] = useState<ShortlinkStatus>(
     shortlink?.status ?? "ACTIVE",
   );
-
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const displayDurationMs = durationPartsToMs(durationMinutes, durationSeconds);
 
   const mediaUnchanged =
-    Boolean(shortlink) &&
-    mediaUrl.trim() === shortlink?.mediaUrl &&
-    mediaType === shortlink?.mediaType;
+    Boolean(shortlink) && mediaUrl.trim() === shortlink?.mediaUrl;
 
   function setValidationErrors(
     issues: Array<{
@@ -111,32 +85,14 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
 
     for (const issue of issues) {
       const key = issue.path[0]?.toString() ?? "_root";
-
       nextErrors[key] ??= issue.message;
     }
 
     setErrors(nextErrors);
   }
 
-  function handleMediaTypeChange(value: string) {
-    const nextMediaType = value as ShortlinkMediaType;
-
-    setMediaType(nextMediaType);
-
-    setErrors((current) => ({
-      ...current,
-      mediaType: "",
-      mediaUrl: "",
-    }));
-
-    if (nextMediaType === "IMAGE") {
-      setPosterUrl("");
-    }
-  }
-
   function handleMediaUrlChange(value: string) {
     setMediaUrl(value);
-
     setErrors((current) => ({
       ...current,
       mediaUrl: "",
@@ -146,25 +102,20 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isSubmitting) {
-      return;
-    }
+    if (isSubmitting) return;
 
     const parsed = createShortlinkSchema.safeParse({
       slug,
       destinationUrl,
       title,
       description: description.trim() || null,
-      mediaType,
       mediaUrl,
-      posterUrl: mediaType === "VIDEO" ? posterUrl : null,
       displayDurationMs,
       status,
     });
 
     if (!parsed.success) {
       setValidationErrors(parsed.error.issues);
-
       return;
     }
 
@@ -181,7 +132,6 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
 
         if (mediaUnchanged) {
           delete updateInput.mediaUrl;
-          delete updateInput.mediaType;
         }
 
         result = await updateShortlinkAction(shortlink.id, updateInput);
@@ -213,7 +163,6 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
         });
 
         setIsSubmitting(false);
-
         return;
       }
 
@@ -254,7 +203,7 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
             </Typography>
 
             <Typography variant="muted" className="mt-1">
-              Configure the destination, social metadata, and public media.
+              Configure the destination, social metadata, and public image.
             </Typography>
           </div>
 
@@ -324,34 +273,9 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
             </FormField>
 
             <FormField
-              label="Media type"
-              htmlFor="shortlink-media-type"
-              description="Choose the intended media type. Nexora Core verifies it once when you save."
-              error={errors.mediaType}
-            >
-              <Select
-                value={mediaType}
-                disabled={isSubmitting}
-                onValueChange={handleMediaTypeChange}
-              >
-                <SelectTrigger id="shortlink-media-type">
-                  <SelectValue />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="IMAGE">Image</SelectItem>
-
-                  <SelectItem value="VIDEO">Video</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-
-            <FormField
-              label={mediaType === "VIDEO" ? "Video URL" : "Image URL"}
+              label="Image URL"
               htmlFor="shortlink-media"
-              description={`A public direct ${
-                mediaType === "VIDEO" ? "video" : "image"
-              } URL. Browser preview is local; Core performs trusted verification only on Save.`}
+              description="A public direct image URL. Browser preview is local; Core performs trusted verification only on Save."
               error={errors.mediaUrl}
             >
               <Input
@@ -360,33 +284,10 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
                 value={mediaUrl}
                 onChange={(event) => handleMediaUrlChange(event.target.value)}
                 disabled={isSubmitting}
-                placeholder={
-                  mediaType === "VIDEO"
-                    ? "https://cdn.example.com/video.mp4"
-                    : "https://cdn.example.com/image.jpg"
-                }
+                placeholder="https://cdn.example.com/image.jpg"
                 autoComplete="off"
               />
             </FormField>
-
-            {mediaType === "VIDEO" ? (
-              <FormField
-                label="Poster URL"
-                htmlFor="shortlink-poster"
-                description="Optional public image URL. No server-side poster generation runs when this is empty."
-                error={errors.posterUrl}
-              >
-                <Input
-                  id="shortlink-poster"
-                  type="url"
-                  value={posterUrl}
-                  onChange={(event) => setPosterUrl(event.target.value)}
-                  disabled={isSubmitting}
-                  placeholder="https://cdn.example.com/poster.jpg"
-                  autoComplete="off"
-                />
-              </FormField>
-            ) : null}
 
             <FormField
               label="Display duration"
@@ -402,26 +303,6 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
                 onSecondsChange={setDurationSeconds}
               />
             </FormField>
-
-            {mediaType === "VIDEO" ? (
-              <FormField
-                label="Original duration"
-                htmlFor="shortlink-original-duration"
-                description="Trusted duration is measured by Nexora Core when the shortlink is saved."
-              >
-                <Input
-                  id="shortlink-original-duration"
-                  value={
-                    mediaUnchanged && shortlink
-                      ? formatShortlinkDuration(shortlink.durationMs)
-                      : "Verified on save"
-                  }
-                  readOnly
-                  disabled
-                  className="tabular-nums"
-                />
-              </FormField>
-            ) : null}
 
             <FormField
               label="Status"
@@ -440,7 +321,6 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
 
                 <SelectContent>
                   <SelectItem value="ACTIVE">Active</SelectItem>
-
                   <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
@@ -453,14 +333,11 @@ export function ShortlinkForm({ shortlink }: ShortlinkFormProps) {
             slug={slug}
             title={title}
             description={description}
-            mediaType={mediaType}
             mediaUrl={mediaUrl}
-            posterUrl={posterUrl}
             displayDurationMs={displayDurationMs}
             status={status}
             mediaWidth={mediaUnchanged ? shortlink?.mediaWidth : undefined}
             mediaHeight={mediaUnchanged ? shortlink?.mediaHeight : undefined}
-            durationMs={mediaUnchanged ? shortlink?.durationMs : undefined}
             mimeType={mediaUnchanged ? shortlink?.mimeType : undefined}
             contentLength={
               mediaUnchanged ? shortlink?.contentLength : undefined

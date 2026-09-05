@@ -18,10 +18,7 @@ import { SemanticBadge } from "@/components/ui/semantic-badge";
 
 import { Typography } from "@/components/ui/typography";
 
-import {
-  getShortlinkMediaBadgeType,
-  getShortlinkStatusBadgeType,
-} from "@/config/badge.config";
+import { getShortlinkStatusBadgeType } from "@/config/badge.config";
 
 import {
   hasPermission,
@@ -33,7 +30,6 @@ import { ShortlinkPreview } from "@/features/shortlinks/components/shortlink-pre
 import {
   formatShortlinkBytes,
   formatShortlinkDisplayDuration,
-  formatShortlinkDuration,
 } from "@/features/shortlinks/shortlink.utils";
 
 import { getShortlink } from "@/features/shortlinks/shortlinks.server";
@@ -77,7 +73,7 @@ export default async function ShortlinkDetailsPage({
           },
         ]}
         title={shortlink.title}
-        description="Review destination, media metadata, status, and preview."
+        description="Review destination, image metadata, status, and preview."
         actions={
           canUpdate ? (
             <Link
@@ -114,12 +110,6 @@ export default async function ShortlinkDetailsPage({
               <DetailField label="Status">
                 <SemanticBadge
                   type={getShortlinkStatusBadgeType(shortlink.status)}
-                />
-              </DetailField>
-
-              <DetailField label="Media type">
-                <SemanticBadge
-                  type={getShortlinkMediaBadgeType(shortlink.mediaType)}
                 />
               </DetailField>
 
@@ -172,7 +162,7 @@ export default async function ShortlinkDetailsPage({
           <Card className="p-5 sm:p-6">
             <div className="mb-6">
               <Typography as="h2" variant="h3">
-                Media metadata
+                Image metadata
               </Typography>
 
               <Typography variant="muted" className="mt-1">
@@ -189,12 +179,6 @@ export default async function ShortlinkDetailsPage({
                 {formatShortlinkDisplayDuration(shortlink.displayDurationMs)}
               </DetailField>
 
-              <DetailField label="Original duration">
-                {shortlink.mediaType === "VIDEO"
-                  ? formatShortlinkDuration(shortlink.durationMs)
-                  : "—"}
-              </DetailField>
-
               <DetailField label="File size">
                 {formatShortlinkBytes(shortlink.contentLength)}
               </DetailField>
@@ -204,7 +188,7 @@ export default async function ShortlinkDetailsPage({
               </DetailField>
 
               <DetailField
-                label="Media URL"
+                label="Image URL"
                 className="sm:col-span-2 xl:col-span-3"
               >
                 <a
@@ -218,26 +202,6 @@ export default async function ShortlinkDetailsPage({
                   <ExternalLink className="size-3.5 shrink-0" />
                 </a>
               </DetailField>
-
-              <DetailField
-                label="Poster URL"
-                className="sm:col-span-2 xl:col-span-3"
-              >
-                {shortlink.posterUrl ? (
-                  <a
-                    href={shortlink.posterUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex max-w-full items-center gap-1.5 text-primary hover:underline"
-                  >
-                    <span className="truncate">{shortlink.posterUrl}</span>
-
-                    <ExternalLink className="size-3.5 shrink-0" />
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground">No poster URL.</span>
-                )}
-              </DetailField>
             </div>
           </Card>
         </div>
@@ -247,14 +211,11 @@ export default async function ShortlinkDetailsPage({
             slug={shortlink.slug}
             title={shortlink.title}
             description={shortlink.description ?? ""}
-            mediaType={shortlink.mediaType}
             mediaUrl={shortlink.mediaUrl}
-            posterUrl={shortlink.posterUrl ?? ""}
             displayDurationMs={shortlink.displayDurationMs}
             status={shortlink.status}
             mediaWidth={shortlink.mediaWidth}
             mediaHeight={shortlink.mediaHeight}
-            durationMs={shortlink.durationMs}
             mimeType={shortlink.mimeType}
             contentLength={shortlink.contentLength}
             sticky

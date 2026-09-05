@@ -1,5 +1,6 @@
 import {
   createShortlinkSchema,
+  isValidShortlinkImageAspectRatio,
   shortlinkListQuerySchema,
   updateShortlinkSchema,
   type PaginatedResult,
@@ -19,17 +20,18 @@ export type UpdateShortlinkResult = {
   result: Shortlink;
 };
 
-function assertMediaType(
-  expected: "IMAGE" | "VIDEO",
-  actual: "IMAGE" | "VIDEO",
-) {
-  if (expected === actual) return;
+function assertImageMedia(mediaType: "IMAGE" | "VIDEO"): void {
+  if (mediaType === "IMAGE") return;
 
-  if (expected === "IMAGE") {
-    throw new Error("The supplied media URL does not contain image media.");
-  }
+  throw new Error("The supplied media URL does not contain image media.");
+}
 
-  throw new Error("The supplied media URL does not contain video media.");
+function assertImageAspectRatio(width: number, height: number): void {
+  if (isValidShortlinkImageAspectRatio(width, height)) return;
+
+  throw new Error(
+    "Shortlink image must use a 16:9 aspect ratio with a maximum tolerance of ±2%.",
+  );
 }
 
 export async function listShortlinks(
@@ -100,19 +102,20 @@ export async function createShortlink(input: unknown): Promise<Shortlink> {
   const data = createShortlinkSchema.parse(input);
   const inspected = await inspectMediaUrl(data.mediaUrl);
 
-  assertMediaType(data.mediaType, inspected.mediaType);
+  assertImageMedia(inspected.mediaType);
+  assertImageAspectRatio(inspected.mediaWidth, inspected.mediaHeight);
 
   const shortlink = await shortlinkRepository.create({
     slug: data.slug,
     destinationUrl: data.destinationUrl,
     title: data.title,
     description: data.description ?? null,
-    mediaType: data.mediaType,
+    mediaType: "IMAGE",
     mediaUrl: data.mediaUrl,
-    posterUrl: data.mediaType === "VIDEO" ? (data.posterUrl ?? null) : null,
+    posterUrl: null,
     mediaWidth: inspected.mediaWidth,
     mediaHeight: inspected.mediaHeight,
-    durationMs: data.mediaType === "VIDEO" ? inspected.durationMs : null,
+    durationMs: null,
     displayDurationMs: data.displayDurationMs,
     mimeType: inspected.mimeType,
     contentLength:
@@ -136,13 +139,6 @@ export async function updateShortlink(
   const before = mapShortlink(existing);
   const data = updateShortlinkSchema.parse(input);
 
-  const requestedMediaType = data.mediaType ?? existing.mediaType;
-  const requestedMediaUrl = data.mediaUrl ?? existing.mediaUrl;
-
-  const mediaChanged =
-    requestedMediaType !== existing.mediaType ||
-    requestedMediaUrl !== existing.mediaUrl;
-
   const updateData: Prisma.ShortlinkUpdateInput = {
     slug: data.slug,
     destinationUrl: data.destinationUrl,
@@ -152,23 +148,18 @@ export async function updateShortlink(
     status: data.status,
   };
 
-  if (requestedMediaType === "IMAGE") {
+  if (data.mediaUrl !== undefined && data.mediaUrl !== existing.mediaUrl) {
+    const inspected = await inspectMediaUrl(data.mediaUrl);
+
+    assertImageMedia(inspected.mediaType);
+    assertImageAspectRatio(inspected.mediaWidth, inspected.mediaHeight);
+
+    updateData.mediaType = "IMAGE";
+    updateData.mediaUrl = data.mediaUrl;
     updateData.posterUrl = null;
-  } else if (data.posterUrl !== undefined) {
-    updateData.posterUrl = data.posterUrl;
-  }
-
-  if (mediaChanged) {
-    const inspected = await inspectMediaUrl(requestedMediaUrl);
-
-    assertMediaType(requestedMediaType, inspected.mediaType);
-
-    updateData.mediaType = requestedMediaType;
-    updateData.mediaUrl = requestedMediaUrl;
     updateData.mediaWidth = inspected.mediaWidth;
     updateData.mediaHeight = inspected.mediaHeight;
-    updateData.durationMs =
-      requestedMediaType === "VIDEO" ? inspected.durationMs : null;
+    updateData.durationMs = null;
     updateData.mimeType = inspected.mimeType;
     updateData.contentLength =
       inspected.contentLength === null ? null : BigInt(inspected.contentLength);

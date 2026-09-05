@@ -57,7 +57,7 @@ export const shortlinkListQuerySchema = z.object({
   mediaType: shortlinkMediaTypeFilterSchema.default("all"),
 });
 
-export const createShortlinkSchema = z.object({
+const shortlinkWriteFields = {
   slug: z
     .string()
     .trim()
@@ -67,37 +67,22 @@ export const createShortlinkSchema = z.object({
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
       "Slug may only contain lowercase letters, numbers, and hyphens.",
     ),
-
   destinationUrl: z.string().trim().url(),
-
   title: z.string().trim().min(1).max(255),
-
   description: z.string().trim().max(1000).nullable().optional(),
-
-  mediaType: shortlinkMediaTypeSchema,
-
   mediaUrl: z.string().trim().url(),
-
-  posterUrl: z
-    .union([z.string().trim().url(), z.literal("")])
-    .nullable()
-    .optional()
-    .transform((value) => value || null),
-
   displayDurationMs: displayDurationMsSchema,
-
   status: shortlinkStatusSchema.default("ACTIVE"),
-});
+};
 
-export const updateShortlinkSchema = createShortlinkSchema.partial();
+export const createShortlinkSchema = z.object(shortlinkWriteFields);
+export const updateShortlinkSchema = z.object(shortlinkWriteFields).partial();
 
 export type Shortlink = z.infer<typeof shortlinkSchema>;
 export type ShortlinkListQuery = z.infer<typeof shortlinkListQuerySchema>;
 export type ShortlinkStatusFilter = z.infer<typeof shortlinkStatusFilterSchema>;
-
 export type ShortlinkMediaTypeFilter = z.infer<
   typeof shortlinkMediaTypeFilterSchema
 >;
-
 export type CreateShortlinkInput = z.infer<typeof createShortlinkSchema>;
 export type UpdateShortlinkInput = z.infer<typeof updateShortlinkSchema>;

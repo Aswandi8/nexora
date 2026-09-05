@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-// const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
-const IDLE_TIMEOUT_MS = 60 * 1000;
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+// const IDLE_TIMEOUT_MS = 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 5 * 1000;
 const CHECK_INTERVAL_MS = 15 * 1000;
 const STORAGE_KEY = "nexora:last-activity";

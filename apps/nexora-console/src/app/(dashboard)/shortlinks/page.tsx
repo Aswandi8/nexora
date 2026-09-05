@@ -10,6 +10,8 @@ import { PageHeaderCard } from "@/components/layout/page-header-card";
 
 import { buttonVariants } from "@/components/ui/button";
 
+import { env } from "@/config/env";
+
 import {
   hasPermission,
   requirePermission,
@@ -29,7 +31,6 @@ interface ShortlinksPageProps {
     limit?: string;
     search?: string;
     status?: string;
-    mediaType?: string;
   }>;
 }
 
@@ -45,7 +46,6 @@ export default async function ShortlinksPage({
     limit: params.limit,
     search: params.search,
     status: params.status,
-    mediaType: params.mediaType,
   });
 
   const shortlinks = await getShortlinks(query);
@@ -87,6 +87,7 @@ export default async function ShortlinksPage({
       <ShortlinksList
         shortlinks={shortlinks.items}
         pagination={shortlinks.pagination}
+        publicBaseUrl={env.NEXORA_CORE_URL}
         canUpdate={canUpdate}
         canDelete={canDelete}
       />
