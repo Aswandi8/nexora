@@ -32,6 +32,14 @@ interface AuthContextFailure {
 }
 
 const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+const SESSION_READY_ATTEMPTS = 5;
+const SESSION_READY_DELAY_MS = 250;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 async function authFetch(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -248,6 +256,38 @@ async function validateSignedInAccount(): Promise<void> {
   );
 }
 
+async function waitForSignedInSession(): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= SESSION_READY_ATTEMPTS; attempt += 1) {
+    try {
+      await validateSignedInAccount();
+      return;
+    } catch (error) {
+      lastError = error;
+
+      if (
+        error instanceof Error &&
+        (error.message.includes("tidak aktif") ||
+          error.message.includes("ditangguhkan") ||
+          error.message.includes("tidak memiliki akses"))
+      ) {
+        throw error;
+      }
+
+      if (attempt < SESSION_READY_ATTEMPTS) {
+        await sleep(SESSION_READY_DELAY_MS);
+      }
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error("Sesi login tidak dapat dibuat. Silakan coba masuk kembali.");
+}
+
 export async function signInWithEmail(
   input: SignInInput,
 ): Promise<SignInResult> {
@@ -267,7 +307,7 @@ export async function signInWithEmail(
   const result = (await response.json()) as SignInResult;
 
   try {
-    await validateSignedInAccount();
+    await waitForSignedInSession();
   } catch (error) {
     await clearSignInSession();
     throw error;
