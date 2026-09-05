@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
 import { prisma } from "@/database/prisma";
+import { sendInvitationEmail } from "@/lib/email/invitation-email";
 
 function requireHttpUrl(name: string, value: string | undefined): string {
   const normalized = value?.trim();
@@ -41,7 +42,6 @@ if (!secret) {
 export const auth = betterAuth({
   baseURL,
   secret,
-
   trustedOrigins: [new URL(consoleURL).origin],
 
   database: prismaAdapter(prisma, {
@@ -50,15 +50,51 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+
+    /*
+     * Core membuat credential sementara acak hanya agar account
+     * credential Better Auth dapat dibuat. Admin dan user tidak
+     * pernah menerima credential sementara tersebut.
+     */
+    autoSignIn: false,
+
+    /*
+     * User invitation tidak boleh login sebelum menyelesaikan link
+     * invitation dan membuat password sendiri.
+     */
+    requireEmailVerification: true,
+
+    sendResetPassword: async ({ user, url }) => {
+      await sendInvitationEmail({
+        to: user.email,
+        name: user.name,
+        url,
+      });
+    },
+
+    /*
+     * Link invitation membuktikan bahwa user mempunyai akses ke inbox.
+     * Setelah password berhasil dibuat, email ditandai verified.
+     */
+    onPasswordReset: async ({ user }) => {
+      await prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          emailVerified: true,
+        },
+      });
+    },
+
+    revokeSessionsOnPasswordReset: true,
+
+    /*
+     * Invitation / password-setup link berlaku selama 1 jam.
+     */
+    resetPasswordTokenExpiresIn: 60 * 60,
   },
 
-  /*
-   * Better Auth already owns the authentication boundary,
-   * therefore rate limiting remains here instead of
-   * introducing another competing limiter around auth.
-   *
-   * Server-side calls through auth.api are not rate limited.
-   */
   rateLimit: {
     enabled: true,
     window: 60,
@@ -71,6 +107,11 @@ export const auth = betterAuth({
       },
 
       "/sign-up/email": {
+        window: 60,
+        max: 3,
+      },
+
+      "/request-password-reset": {
         window: 60,
         max: 3,
       },

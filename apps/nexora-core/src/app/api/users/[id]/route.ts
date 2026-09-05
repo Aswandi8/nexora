@@ -2,7 +2,11 @@ import { PERMISSIONS } from "@nexora/contracts";
 
 import { authenticateAdminRequest, requirePermission } from "@/auth";
 import { apiError, apiSuccess } from "@/lib/api/api-response";
-import { writeAuditLog } from "@/lib/audit";
+import {
+  buildAuditChanges,
+  getAuditChangedFields,
+  writeAuditLog,
+} from "@/lib/audit";
 import { invalidateDashboardCache } from "@/lib/cache/cache-invalidation";
 import { deleteUser, getUserById, updateUser } from "@/modules/users";
 
@@ -33,7 +37,26 @@ export async function PATCH(request: Request, context: RouteContext) {
       requirePermission(authContext, PERMISSIONS.USERS_ASSIGN_ROLE);
     }
 
-    const result = await updateUser(id, body);
+    const { before, result } = await updateUser(id, body, authContext.user.id);
+
+    const changes = buildAuditChanges({
+      name: {
+        from: before.name,
+        to: result.name,
+      },
+      email: {
+        from: before.email,
+        to: result.email,
+      },
+      status: {
+        from: before.status,
+        to: result.status,
+      },
+      role: {
+        from: before.role.code,
+        to: result.role.code,
+      },
+    });
 
     await writeAuditLog({
       request,
@@ -41,8 +64,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       action: "UPDATE",
       resource: "USER",
       resourceId: id,
-      changedFields: Object.keys(body ?? {}),
+      changedFields: getAuditChangedFields(changes),
+      metadata: {
+        resourceLabel: result.name,
+        changes,
+      },
     });
+
+    invalidateDashboardCache();
 
     return apiSuccess(result);
   } catch (error) {
@@ -56,7 +85,8 @@ export async function DELETE(request: Request, context: RouteContext) {
     requirePermission(authContext, PERMISSIONS.USERS_DELETE);
 
     const { id } = await context.params;
-    const result = await deleteUser(id);
+
+    const result = await deleteUser(id, authContext.user.id);
 
     invalidateDashboardCache();
 
@@ -66,6 +96,9 @@ export async function DELETE(request: Request, context: RouteContext) {
       action: "DELETE",
       resource: "USER",
       resourceId: id,
+      metadata: {
+        resourceLabel: result.name,
+      },
     });
 
     return apiSuccess(result);

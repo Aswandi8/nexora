@@ -10,6 +10,14 @@ import { ApiRequestError } from "@/lib/api/error";
 
 import { serverApiRequest } from "@/lib/api/server";
 
+function isInvalidAccountSession(error: ApiRequestError): boolean {
+  return (
+    error.status === 401 ||
+    error.code === "ACCOUNT_INACTIVE" ||
+    error.code === "ACCOUNT_SUSPENDED"
+  );
+}
+
 const getAdminSessionCached = cache(async (): Promise<AdminSession | null> => {
   try {
     const data = await serverApiRequest<AdminSession>("/api/auth/context", {
@@ -19,7 +27,7 @@ const getAdminSessionCached = cache(async (): Promise<AdminSession | null> => {
 
     return adminSessionSchema.parse(data);
   } catch (error) {
-    if (error instanceof ApiRequestError && error.status === 401) {
+    if (error instanceof ApiRequestError && isInvalidAccountSession(error)) {
       return null;
     }
 

@@ -69,7 +69,14 @@ function mapKnownApplicationError(error: Error): Response | null {
       return createErrorResponse(
         403,
         API_ERROR_CODES.ACCOUNT_INACTIVE,
-        "Akun tidak aktif.",
+        "Akun Anda tidak aktif.",
+      );
+
+    case "ACCOUNT_SUSPENDED":
+      return createErrorResponse(
+        403,
+        API_ERROR_CODES.ACCOUNT_SUSPENDED,
+        "Akun Anda ditangguhkan.",
       );
 
     case "FORBIDDEN":
@@ -139,7 +146,7 @@ function mapKnownApplicationError(error: Error): Response | null {
       return createErrorResponse(
         409,
         API_ERROR_CODES.CONFLICT,
-        "Email tersebut sudah digunakan oleh user lain.",
+        "Email tersebut sudah terdaftar. Gunakan Kirim Ulang Undangan jika user belum menyelesaikan aktivasi.",
       );
 
     case "USER_ROLE_NOT_FOUND":
@@ -154,6 +161,20 @@ function mapKnownApplicationError(error: Error): Response | null {
         500,
         API_ERROR_CODES.INTERNAL_ERROR,
         "Akun user tidak dapat dibuat.",
+      );
+
+    case "USER_INVITATION_ALREADY_COMPLETED":
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Email user sudah terverifikasi dan tidak memerlukan undangan baru.",
+      );
+
+    case "USER_INVITATION_DELIVERY_FAILED":
+      return createErrorResponse(
+        502,
+        API_ERROR_CODES.EXTERNAL_API_ERROR,
+        "Undangan tidak dapat dikirim. Silakan coba lagi.",
       );
 
     case "SUPER_ADMIN_USER_ASSIGNMENT_FORBIDDEN":
@@ -182,6 +203,20 @@ function mapKnownApplicationError(error: Error): Response | null {
         409,
         API_ERROR_CODES.CONFLICT,
         "Akun Super Admin dilindungi dan tidak dapat dihapus.",
+      );
+
+    case "USER_SELF_STATUS_UPDATE_FORBIDDEN":
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Anda tidak dapat menonaktifkan atau menangguhkan akun Anda sendiri.",
+      );
+
+    case "USER_SELF_DELETE_FORBIDDEN":
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Anda tidak dapat menghapus akun Anda sendiri.",
       );
 
     case "MEDIA_URL_INVALID":
@@ -255,62 +290,34 @@ export function apiError(error: unknown): Response {
     );
   }
 
+  if (error instanceof Error) {
+    const knownError = mapKnownApplicationError(error);
+
+    if (knownError) {
+      return knownError;
+    }
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002") {
-      return createErrorResponse(
-        409,
-        API_ERROR_CODES.CONFLICT,
-        "Data dengan nilai tersebut sudah ada.",
-      );
-    }
-
-    if (error.code === "P2003") {
-      return createErrorResponse(
-        409,
-        API_ERROR_CODES.CONFLICT,
-        "Data masih digunakan oleh data lain dan tidak dapat diproses.",
-      );
-    }
-
-    if (error.code === "P2025") {
-      return createErrorResponse(
-        404,
-        API_ERROR_CODES.NOT_FOUND,
-        "Data tidak ditemukan.",
-      );
-    }
-
-    logger.error("api.database.failed", {
-      prismaCode: error.code,
-      errorName: error.name,
+    logger.error("database_request_failed", {
+      code: error.code,
+      target: error.meta?.target,
     });
 
     return createErrorResponse(
       500,
       API_ERROR_CODES.DATABASE_ERROR,
-      "Terjadi kesalahan database.",
+      "Terjadi gangguan saat mengakses database.",
     );
   }
 
-  if (error instanceof Error) {
-    const response = mapKnownApplicationError(error);
-
-    if (response) {
-      return response;
-    }
-
-    logger.error("api.unhandled-error", {
-      error,
-    });
-  } else {
-    logger.error("api.unhandled-error", {
-      errorType: typeof error,
-    });
-  }
+  logger.error("unhandled_api_error", {
+    error,
+  });
 
   return createErrorResponse(
     500,
     API_ERROR_CODES.INTERNAL_ERROR,
-    "Terjadi kesalahan internal pada server.",
+    "Terjadi kesalahan internal.",
   );
 }

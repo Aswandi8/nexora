@@ -1,4 +1,5 @@
 "use client";
+
 import {
   SUPER_ADMIN_ROLE_CODE,
   createUserSchema,
@@ -23,8 +24,6 @@ import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 
 import { Input } from "@/components/ui/input";
-
-import { PasswordInput } from "@/components/ui/password-input";
 
 import { SemanticBadge } from "@/components/ui/semantic-badge";
 
@@ -58,8 +57,6 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
   const [name, setName] = useState(user?.name ?? "");
 
   const [email, setEmail] = useState(user?.email ?? "");
-
-  const [password, setPassword] = useState("");
 
   const [status, setStatus] = useState<UserStatus>(user?.status ?? "ACTIVE");
 
@@ -163,7 +160,6 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
     const parsed = createUserSchema.safeParse({
       name,
       email,
-      password,
       status,
       roleId: selectedRoleId,
     });
@@ -192,11 +188,20 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
       return;
     }
 
-    toast({
-      title: "User created",
-      description: "The new user account is ready.",
-      variant: "success",
-    });
+    if (result.invitationSent) {
+      toast({
+        title: "Invitation sent",
+        description: `An invitation has been sent to ${parsed.data.email}.`,
+        variant: "success",
+      });
+    } else {
+      toast({
+        title: "User created",
+        description:
+          "The user was created, but the invitation could not be delivered. You can resend it from the Users menu.",
+        variant: "destructive",
+      });
+    }
 
     router.push("/users");
   }
@@ -230,7 +235,7 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
             <Typography variant="muted" className="mt-1">
               {isEditing
                 ? "Update the user identity, account status, and access role."
-                : "Create the identity, login credentials, and access role for this user."}
+                : "Create the user identity and access role. Nexora will send an invitation so the user can create their own password."}
             </Typography>
           </div>
 
@@ -246,7 +251,16 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
               />
             </FormField>
 
-            <FormField label="Email" htmlFor="user-email" error={errors.email}>
+            <FormField
+              label="Email"
+              htmlFor="user-email"
+              description={
+                isEditing
+                  ? undefined
+                  : "An invitation will be sent to this email address."
+              }
+              error={errors.email}
+            >
               <Input
                 id="user-email"
                 type="email"
@@ -258,32 +272,15 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
               />
             </FormField>
 
-            {!isEditing ? (
-              <FormField
-                label="Password"
-                htmlFor="user-password"
-                description="Minimum 8 characters."
-                error={errors.password}
-              >
-                <PasswordInput
-                  id="user-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  disabled={isSubmitting}
-                  placeholder="Create password"
-                  autoComplete="new-password"
-                  className="h-9 rounded-md bg-background"
-                />
-              </FormField>
-            ) : null}
-
             <FormField
               label="Status"
               htmlFor="user-status"
               description={
                 isProtectedUser
                   ? "Super Admin must remain active."
-                  : "Controls whether this account may access Nexora."
+                  : isEditing
+                    ? "Controls whether this account may access Nexora."
+                    : "The account cannot sign in until the invitation is completed."
               }
               error={errors.status}
             >
@@ -350,10 +347,12 @@ export function UserForm({ user, roles, canManageRoles }: UserFormProps) {
             disabled={isSubmitting || (!isEditing && !canManageRoles)}
           >
             {isSubmitting
-              ? "Saving..."
+              ? isEditing
+                ? "Saving..."
+                : "Sending invitation..."
               : isEditing
                 ? "Save changes"
-                : "Create user"}
+                : "Create & send invitation"}
           </Button>
         </div>
       </form>

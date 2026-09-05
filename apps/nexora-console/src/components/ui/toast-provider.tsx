@@ -18,6 +18,7 @@ export interface ToastInput {
   title: string;
   description?: string;
   variant?: ToastVariant;
+  icon?: ReactNode;
   duration?: number;
 }
 
@@ -44,6 +45,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
       title,
       description,
       variant = "default",
+      icon,
       duration = 4000,
     }: ToastInput) => {
       const id = crypto.randomUUID();
@@ -55,6 +57,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
           title,
           description,
           variant,
+          icon,
         },
       ]);
 
@@ -77,7 +80,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <ToastContext.Provider value={value}>
       {children}
 
-      <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(420px,calc(100vw-2rem))] flex-col gap-2">
+      <div className="pointer-events-none fixed right-4 top-4 z-110 flex w-[min(420px,calc(100vw-2rem))] flex-col gap-2">
         {toasts.map((item) => (
           <Toast key={item.id} toast={item} onDismiss={dismiss} />
         ))}

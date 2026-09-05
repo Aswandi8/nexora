@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,7 @@ export interface ToastItem {
   title: string;
   description?: string;
   variant?: ToastVariant;
+  icon?: ReactNode;
 }
 
 interface ToastProps {
@@ -19,7 +21,7 @@ interface ToastProps {
 }
 
 export function Toast({ toast, onDismiss }: ToastProps) {
-  const Icon =
+  const DefaultIcon =
     toast.variant === "success"
       ? CheckCircle2
       : toast.variant === "destructive"
@@ -35,15 +37,18 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       )}
       role="status"
     >
-      <Icon
+      <div
         className={cn(
-          "mt-0.5 size-4 shrink-0",
+          "mt-0.5 flex size-4 shrink-0 items-center justify-center",
           toast.variant === "success" && "text-success",
           toast.variant === "destructive" && "text-destructive",
           (!toast.variant || toast.variant === "default") &&
             "text-muted-foreground",
+          "[&_svg]:size-4",
         )}
-      />
+      >
+        {toast.icon ?? <DefaultIcon className="size-4" />}
+      </div>
 
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{toast.title}</p>

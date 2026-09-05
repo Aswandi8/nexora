@@ -1,14 +1,18 @@
+import { randomBytes } from "node:crypto";
+
 import {
   SUPER_ADMIN_ROLE_CODE,
   createUserSchema,
   updateUserSchema,
   userListQuerySchema,
+  type CreateUserResult,
   type PaginatedResult,
   type User,
   type UserListItem,
 } from "@nexora/contracts";
 
 import { auth } from "@/auth";
+import { logger } from "@/lib/observability/logger";
 
 import { USER_ERRORS } from "./user.errors";
 import { mapUser, mapUserListItem } from "./user.mapper";
@@ -37,6 +41,41 @@ function isSuperAdminUser(
   user: Awaited<ReturnType<typeof userRepository.findById>>,
 ): boolean {
   return user?.userRole?.role.code === SUPER_ADMIN_ROLE_CODE;
+}
+
+function createTemporaryPassword(): string {
+  return randomBytes(48).toString("base64url");
+}
+
+function getInvitationRedirectUrl(): string {
+  const value = process.env.NEXORA_CONSOLE_URL?.trim();
+
+  if (!value) {
+    throw new Error("NEXORA_CONSOLE_URL is not configured");
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("NEXORA_CONSOLE_URL must be a valid URL");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("NEXORA_CONSOLE_URL must use http or https");
+  }
+
+  return `${url.origin}/accept-invitation`;
+}
+
+async function sendUserInvitation(email: string): Promise<void> {
+  await auth.api.requestPasswordReset({
+    body: {
+      email,
+      redirectTo: getInvitationRedirectUrl(),
+    },
+  });
 }
 
 export async function listUsers(
@@ -79,9 +118,15 @@ export async function getUserById(id: string): Promise<User> {
   return mapUser(user);
 }
 
-export async function createUser(input: unknown): Promise<User> {
+export async function createUser(input: unknown): Promise<CreateUserResult> {
   const data = createUserSchema.parse(input);
 
+  /*
+   * Create User bukan Resend Invitation.
+   *
+   * Email yang sudah ada, termasuk account yang masih Pending,
+   * harus berhenti di sini dan tidak boleh menghasilkan email baru.
+   */
   const existing = await userRepository.findByEmail(data.email);
 
   if (existing) {
@@ -89,23 +134,28 @@ export async function createUser(input: unknown): Promise<User> {
   }
 
   const roleId = await validateAssignableRole(data.roleId);
+  const temporaryPassword = createTemporaryPassword();
 
-  await auth.api.signUpEmail({
+  const signUpResult = await auth.api.signUpEmail({
     body: {
       name: data.name,
       email: data.email,
-      password: data.password,
+      password: temporaryPassword,
     },
   });
 
-  const created = await userRepository.findByEmail(data.email);
+  const createdUserId = signUpResult.user.id;
 
-  if (!created) {
+  const created = await userRepository.findById(createdUserId);
+
+  if (!created || created.email !== data.email) {
     throw new Error(USER_ERRORS.CREATION_FAILED);
   }
 
+  let user: Awaited<ReturnType<typeof userRepository.configureCreatedUser>>;
+
   try {
-    const user = await userRepository.configureCreatedUser(created.id, {
+    user = await userRepository.configureCreatedUser(createdUserId, {
       status: data.status,
       roleId,
     });
@@ -113,20 +163,83 @@ export async function createUser(input: unknown): Promise<User> {
     if (!user.userRole) {
       throw new Error(USER_ERRORS.CREATION_FAILED);
     }
-
-    return mapUser(user);
   } catch (error) {
-    await userRepository.delete(created.id).catch((cleanupError: unknown) => {
-      console.error("Failed to rollback newly created user.", cleanupError);
-    });
+    await userRepository
+      .delete(createdUserId)
+      .catch((cleanupError: unknown) => {
+        logger.error("user.create.rollback-failed", {
+          userId: createdUserId,
+          error: cleanupError,
+        });
+      });
 
     throw error;
   }
+
+  const mappedUser = mapUser(user);
+
+  /*
+   * User sudah valid tersimpan.
+   * Kegagalan provider email tidak menghapus account.
+   */
+  let invitationSent = true;
+
+  try {
+    await sendUserInvitation(mappedUser.email);
+  } catch (error) {
+    invitationSent = false;
+
+    logger.error("user.invitation.delivery-failed", {
+      userId: mappedUser.id,
+      email: mappedUser.email,
+      error,
+    });
+  }
+
+  return {
+    user: mappedUser,
+    invitationSent,
+  };
+}
+
+export async function resendUserInvitation(id: string): Promise<User> {
+  const existing = await userRepository.findById(id);
+
+  if (!existing) {
+    throw new Error(USER_ERRORS.NOT_FOUND);
+  }
+
+  /*
+   * Verified account tidak boleh menerima invitation lagi.
+   *
+   * Ini divalidasi di server, jadi bukan sekadar penyembunyian
+   * tombol pada Console.
+   */
+  if (existing.emailVerified) {
+    throw new Error(USER_ERRORS.INVITATION_ALREADY_COMPLETED);
+  }
+
+  const user = mapUser(existing);
+
+  try {
+    await sendUserInvitation(user.email);
+  } catch (error) {
+    logger.error("user.invitation.resend-failed", {
+      userId: user.id,
+      email: user.email,
+      error,
+    });
+
+    throw new Error(USER_ERRORS.INVITATION_DELIVERY_FAILED);
+  }
+
+  return user;
 }
 
 export async function updateUser(
   id: string,
   input: unknown,
+  actorUserId: string,
 ): Promise<UpdateUserResult> {
   const existing = await userRepository.findById(id);
 
@@ -138,12 +251,15 @@ export async function updateUser(
   const data = updateUserSchema.parse(input);
   const protectedUser = isSuperAdminUser(existing);
 
-  if (
-    protectedUser &&
-    data.status !== undefined &&
-    data.status !== existing.status
-  ) {
+  const statusChanged =
+    data.status !== undefined && data.status !== existing.status;
+
+  if (protectedUser && statusChanged) {
     throw new Error(USER_ERRORS.SUPER_ADMIN_STATUS_UPDATE);
+  }
+
+  if (id === actorUserId && statusChanged && data.status !== "ACTIVE") {
+    throw new Error(USER_ERRORS.SELF_STATUS_UPDATE);
   }
 
   if (protectedUser && data.roleId !== undefined) {
@@ -151,9 +267,11 @@ export async function updateUser(
   }
 
   let roleId: string | undefined;
+  let roleChanged = false;
 
   if (data.roleId !== undefined) {
     roleId = await validateAssignableRole(data.roleId);
+    roleChanged = roleId !== existing.userRole?.role.id;
   }
 
   if (data.email !== undefined && data.email !== existing.email) {
@@ -169,6 +287,7 @@ export async function updateUser(
     email: data.email,
     status: protectedUser ? undefined : data.status,
     roleId: protectedUser ? undefined : roleId,
+    revokeSessions: statusChanged || roleChanged,
   });
 
   return {
@@ -177,11 +296,18 @@ export async function updateUser(
   };
 }
 
-export async function deleteUser(id: string): Promise<User> {
+export async function deleteUser(
+  id: string,
+  actorUserId: string,
+): Promise<User> {
   const existing = await userRepository.findById(id);
 
   if (!existing) {
     throw new Error(USER_ERRORS.NOT_FOUND);
+  }
+
+  if (id === actorUserId) {
+    throw new Error(USER_ERRORS.SELF_DELETE);
   }
 
   if (isSuperAdminUser(existing)) {

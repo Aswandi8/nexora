@@ -17,6 +17,7 @@ export const userSchema = z.object({
   id: z.string(),
   name: z.string().min(2).max(100),
   email: z.string().email(),
+  emailVerified: z.boolean(),
   status: userStatusSchema,
   role: roleSchema,
   permissions: z.array(permissionCodeSchema),
@@ -28,6 +29,7 @@ export const userListItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().email(),
+  emailVerified: z.boolean(),
   status: userStatusSchema,
   role: userRoleSummarySchema,
   isSuperAdmin: z.boolean(),
@@ -38,43 +40,37 @@ export const userStatusFilterSchema = z.enum(["all", ...USER_STATUSES]);
 
 export const userListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-
   limit: z.coerce.number().int().min(1).max(100).default(20),
-
   search: z.string().trim().max(100).default(""),
-
   status: userStatusFilterSchema.default("all"),
 });
 
 export const createUserSchema = z.object({
   name: z.string().trim().min(2).max(100),
-
   email: z
     .string()
     .trim()
     .email()
     .transform((value) => value.toLowerCase()),
-
-  password: z.string().min(8).max(128),
-
   status: userStatusSchema.default("ACTIVE"),
-
   roleId: z.string().min(1, "Role is required."),
 });
 
 export const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
-
   email: z
     .string()
     .trim()
     .email()
     .transform((value) => value.toLowerCase())
     .optional(),
-
   status: userStatusSchema.optional(),
-
   roleId: z.string().min(1, "Role is required.").optional(),
+});
+
+export const createUserResultSchema = z.object({
+  user: userSchema,
+  invitationSent: z.boolean(),
 });
 
 export type User = z.infer<typeof userSchema>;
@@ -84,3 +80,4 @@ export type UserStatusFilter = z.infer<typeof userStatusFilterSchema>;
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type CreateUserResult = z.infer<typeof createUserResultSchema>;

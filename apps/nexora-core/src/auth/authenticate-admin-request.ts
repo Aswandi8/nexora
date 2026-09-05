@@ -42,13 +42,11 @@ export async function authenticateAdminRequest(
     where: {
       id: session.user.id,
     },
-
     select: {
       id: true,
       name: true,
       email: true,
       status: true,
-
       userRole: {
         select: {
           role: {
@@ -73,8 +71,12 @@ export async function authenticateAdminRequest(
     throw new Error("AUTH_REQUIRED");
   }
 
-  if (user.status !== "ACTIVE") {
+  if (user.status === "INACTIVE") {
     throw new Error("ACCOUNT_INACTIVE");
+  }
+
+  if (user.status === "SUSPENDED") {
+    throw new Error("ACCOUNT_SUSPENDED");
   }
 
   const permissionCodes =
@@ -91,7 +93,6 @@ export async function authenticateAdminRequest(
       email: user.email,
       status: "ACTIVE",
     },
-
     permissions,
   };
 }

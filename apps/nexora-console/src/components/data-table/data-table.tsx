@@ -5,9 +5,7 @@ import { useTransition } from "react";
 import { Card } from "@/components/ui/card";
 
 import { DataTablePagination } from "./data-table-pagination";
-
 import { DataTableToolbar } from "./data-table-toolbar";
-
 import type { DataTableProps } from "./data-table.types";
 
 export function DataTable<T>({
@@ -20,9 +18,11 @@ export function DataTable<T>({
   pageSizeOptions,
   emptyTitle = "No data found",
   emptyDescription = "There are no records to display.",
+  externalPending = false,
   renderActions,
 }: DataTableProps<T>) {
-  const [isPending, startTransition] = useTransition();
+  const [navigationPending, startTransition] = useTransition();
+  const isPending = navigationPending || externalPending;
 
   const skeletonRows =
     data.length > 0 ? data.length : Math.min(pagination.limit, 5);
@@ -66,9 +66,7 @@ export function DataTable<T>({
 
               <tbody>
                 {isPending ? (
-                  Array.from({
-                    length: skeletonRows,
-                  }).map((_, rowIndex) => (
+                  Array.from({ length: skeletonRows }).map((_, rowIndex) => (
                     <tr
                       key={`skeleton-${rowIndex}`}
                       className="border-b border-border last:border-b-0"

@@ -28,27 +28,19 @@ export interface DataTableActionContext {
 
 export interface DataTableProps<T> {
   data: T[];
-
   columns: DataTableColumn<T>[];
-
   pagination: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
   };
-
   getRowKey: (item: T) => string;
-
   searchPlaceholder?: string;
-
   filters?: DataTableFilter[];
-
   pageSizeOptions?: number[];
-
   emptyTitle?: string;
-
   emptyDescription?: string;
-
+  externalPending?: boolean;
   renderActions?: (item: T, context: DataTableActionContext) => ReactNode;
 }

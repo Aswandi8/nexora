@@ -99,7 +99,7 @@ export function SelectContent({
         collisionPadding={collisionPadding}
         avoidCollisions
         className={cn(
-          "relative z-70 max-h-[min(24rem,var(--radix-select-content-available-height))] min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl outline-none",
+          "relative z-100 max-h-[min(24rem,var(--radix-select-content-available-height))] min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

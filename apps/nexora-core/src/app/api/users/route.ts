@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     requirePermission(authContext, PERMISSIONS.USERS_READ);
 
     const url = new URL(request.url);
+
     const result = await listUsers({
       page: url.searchParams.get("page") ?? undefined,
       limit: url.searchParams.get("limit") ?? undefined,
@@ -45,8 +46,12 @@ export async function POST(request: Request) {
       actor: authContext,
       action: "CREATE",
       resource: "USER",
-      resourceId: result.id,
-      changedFields: Object.keys(body ?? {}),
+      resourceId: result.user.id,
+      changedFields: ["name", "email", "status", "role"],
+      metadata: {
+        resourceLabel: result.user.name,
+        invitationSent: result.invitationSent,
+      },
     });
 
     return apiSuccess(result, 201);

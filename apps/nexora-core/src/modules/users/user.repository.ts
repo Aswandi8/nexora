@@ -154,13 +154,6 @@ export const userRepository = {
       roleId: string;
     },
   ) {
-    /*
-     * Better Auth signUpEmail may create a session for
-     * the newly-created account.
-     *
-     * Status configuration, session cleanup and role
-     * assignment are executed as one atomic nested write.
-     */
     return prisma.user.update({
       where: {
         id,
@@ -187,15 +180,9 @@ export const userRepository = {
       email?: string;
       status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
       roleId?: string;
+      revokeSessions?: boolean;
     },
   ) {
-    /*
-     * User fields and optional role assignment belong to
-     * one atomic Prisma nested write.
-     *
-     * The updated detail is returned from the same
-     * operation, removing the extra findById round-trip.
-     */
     return prisma.user.update({
       where: {
         id,
@@ -215,6 +202,13 @@ export const userRepository = {
                     roleId: data.roleId,
                   },
                 },
+              },
+            }
+          : {}),
+        ...(data.revokeSessions
+          ? {
+              sessions: {
+                deleteMany: {},
               },
             }
           : {}),
