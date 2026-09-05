@@ -15,6 +15,7 @@
     "lint:console": "pnpm --filter nexora-console lint",
     "check": "pnpm typecheck:core && pnpm typecheck:console && pnpm lint:core && pnpm lint:console",
     "test:smoke": "node scripts/smoke.mjs",
+    "audit:readiness": "node scripts/readiness.mjs",
     "db:generate": "pnpm --filter nexora-core exec prisma generate",
     "db:migrate:status": "pnpm --filter nexora-core exec prisma migrate status",
     "db:migrate:deploy": "pnpm --filter nexora-core exec prisma migrate deploy",
