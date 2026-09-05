@@ -3,7 +3,6 @@
 import { type FormEvent, useState } from "react";
 
 import { Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { WorkspaceLoading } from "@/components/feedback/workspace-loading";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { signInWithEmail } from "./auth.client";
 
 export function LoginForm() {
-  const router = useRouter();
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
@@ -47,8 +45,7 @@ export function LoginForm() {
         variant: "success",
       });
 
-      router.replace("/dashboard");
-      router.refresh();
+      window.location.replace("/dashboard");
     } catch (error) {
       toast({
         title: "Gagal masuk",
