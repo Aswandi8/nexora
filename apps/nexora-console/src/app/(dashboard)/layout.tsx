@@ -1,5 +1,6 @@
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { requireAdminSession } from "@/features/auth/auth.server";
+import { IdleSessionGuard } from "@/features/security/components/idle-session-guard";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -10,5 +11,10 @@ export default async function DashboardLayout({
 }: DashboardLayoutProps) {
   const session = await requireAdminSession();
 
-  return <DashboardShell session={session}>{children}</DashboardShell>;
+  return (
+    <>
+      <IdleSessionGuard />{" "}
+      <DashboardShell session={session}>{children}</DashboardShell>
+    </>
+  );
 }

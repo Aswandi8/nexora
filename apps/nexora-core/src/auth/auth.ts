@@ -50,19 +50,11 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-
-    /*
-     * Core membuat credential sementara acak hanya agar account
-     * credential Better Auth dapat dibuat. Admin dan user tidak
-     * pernah menerima credential sementara tersebut.
-     */
     autoSignIn: false,
-
-    /*
-     * User invitation tidak boleh login sebelum menyelesaikan link
-     * invitation dan membuat password sendiri.
-     */
     requireEmailVerification: true,
+
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
 
     sendResetPassword: async ({ user, url }) => {
       await sendInvitationEmail({
@@ -72,10 +64,6 @@ export const auth = betterAuth({
       });
     },
 
-    /*
-     * Link invitation membuktikan bahwa user mempunyai akses ke inbox.
-     * Setelah password berhasil dibuat, email ditandai verified.
-     */
     onPasswordReset: async ({ user }) => {
       await prisma.user.update({
         where: {
@@ -88,10 +76,6 @@ export const auth = betterAuth({
     },
 
     revokeSessionsOnPasswordReset: true,
-
-    /*
-     * Invitation / password-setup link berlaku selama 1 jam.
-     */
     resetPasswordTokenExpiresIn: 60 * 60,
   },
 
@@ -114,6 +98,11 @@ export const auth = betterAuth({
       "/request-password-reset": {
         window: 60,
         max: 3,
+      },
+
+      "/change-password": {
+        window: 60,
+        max: 5,
       },
     },
   },

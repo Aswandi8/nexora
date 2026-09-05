@@ -1,18 +1,18 @@
-import { adminSessionSchema } from "@nexora/contracts";
+import { accountEmailSecuritySchema } from "@nexora/contracts";
 
 import { authenticateAdminRequest } from "@/auth";
+
 import { apiError, apiSuccess } from "@/lib/api/api-response";
+
+import { getOwnEmailSecurity } from "@/modules/account";
 
 export async function GET(request: Request) {
   try {
     const authContext = await authenticateAdminRequest(request.headers);
 
-    const session = adminSessionSchema.parse({
-      user: authContext.user,
-      permissions: authContext.permissions,
-    });
+    const result = await getOwnEmailSecurity(authContext.user.id);
 
-    return apiSuccess(session);
+    return apiSuccess(accountEmailSecuritySchema.parse(result));
   } catch (error) {
     return apiError(error);
   }

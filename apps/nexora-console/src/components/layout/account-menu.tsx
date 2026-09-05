@@ -2,7 +2,7 @@
 
 import type { AdminSession } from "@nexora/contracts/auth";
 
-import { ChevronDown, Settings, UserRound } from "lucide-react";
+import { ChevronDown, Settings } from "lucide-react";
 
 import Link from "next/link";
 
@@ -71,13 +71,6 @@ export function AccountMenu({ session }: AccountMenuProps) {
         </div>
 
         <DropdownMenuSeparator />
-
-        <DropdownMenuItem asChild>
-          <Link href="/account">
-            <UserRound className="size-4" />
-            <span>Account</span>
-          </Link>
-        </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
           <Link href="/settings">

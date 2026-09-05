@@ -16,6 +16,20 @@ type WriteAuditLogInput = {
   metadata?: Record<string, unknown>;
 };
 
+type WriteSystemAuditLogInput = {
+  request: Request;
+  actor: {
+    userId: string;
+    name: string;
+    email: string;
+  };
+  action: AuditAction;
+  resource: AuditResource;
+  resourceId?: string;
+  changedFields?: string[];
+  metadata?: Record<string, unknown>;
+};
+
 function getRequestId(headers: Headers): string {
   const requestId = headers.get("x-request-id")?.trim();
 
@@ -24,7 +38,6 @@ function getRequestId(headers: Headers): string {
 
 function getIpAddress(headers: Headers): string | null {
   const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-
   const realIp = headers.get("x-real-ip")?.trim();
 
   return (forwardedFor || realIp || null)?.slice(0, 128) ?? null;
@@ -67,6 +80,49 @@ export async function writeAuditLog(input: WriteAuditLogInput): Promise<void> {
     logger.error("audit.write-failed", {
       requestId,
       actorUserId: input.actor.user.id,
+      action: input.action,
+      resource: input.resource,
+      resourceId: input.resourceId,
+      error,
+    });
+  }
+}
+
+export async function writeSystemAuditLog(
+  input: WriteSystemAuditLogInput,
+): Promise<void> {
+  const requestId = getRequestId(input.request.headers);
+
+  try {
+    await createAuditLog({
+      actor: {
+        userId: input.actor.userId,
+        name: input.actor.name,
+        email: input.actor.email,
+      },
+      request: {
+        requestId,
+        ipAddress: getIpAddress(input.request.headers),
+        userAgent: getUserAgent(input.request.headers),
+      },
+      action: input.action,
+      resource: input.resource,
+      resourceId: input.resourceId,
+      changedFields: input.changedFields,
+      metadata: input.metadata,
+    });
+
+    logger.info("audit.recorded", {
+      requestId,
+      actorUserId: input.actor.userId,
+      action: input.action,
+      resource: input.resource,
+      resourceId: input.resourceId,
+    });
+  } catch (error) {
+    logger.error("audit.write-failed", {
+      requestId,
+      actorUserId: input.actor.userId,
       action: input.action,
       resource: input.resource,
       resourceId: input.resourceId,

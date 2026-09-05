@@ -4,7 +4,7 @@ export {
   type AuditChanges,
 } from "./audit-changes";
 
-export { writeAuditLog } from "./audit.service";
+export { writeAuditLog, writeSystemAuditLog } from "./audit.service";
 
 export type {
   AuditAction,

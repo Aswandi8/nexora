@@ -5,8 +5,10 @@ import {
   KeyRound,
   LayoutDashboard,
   Link2,
+  LockKeyhole,
   Settings,
   ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 
@@ -39,6 +41,8 @@ const navigationIcons: Record<NavigationIcon, NavigationIconComponent> = {
   roles: ShieldCheck,
   permissions: KeyRound,
   settings: Settings,
+  profile: UserRound,
+  security: LockKeyhole,
 };
 
 function isPathActive(pathname: string, href?: string): boolean {

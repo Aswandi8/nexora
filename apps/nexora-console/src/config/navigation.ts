@@ -9,7 +9,9 @@ export type NavigationIcon =
   | "users"
   | "roles"
   | "permissions"
-  | "settings";
+  | "settings"
+  | "profile"
+  | "security";
 
 export interface NavigationChild {
   title: string;
@@ -80,7 +82,23 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       {
         title: "Settings",
+        href: "/settings",
         icon: "settings",
+      },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      {
+        title: "Profile",
+        href: "/profile",
+        icon: "profile",
+      },
+      {
+        title: "Security",
+        href: "/security",
+        icon: "security",
       },
     ],
   },

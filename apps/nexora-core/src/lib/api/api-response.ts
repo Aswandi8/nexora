@@ -58,6 +58,48 @@ function mapZodFields(error: ZodError): Record<string, string[]> {
 
 function mapKnownApplicationError(error: Error): Response | null {
   switch (error.message) {
+    case "EMAIL_UNCHANGED":
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Email baru harus berbeda dari email saat ini.",
+      );
+
+    case "EMAIL_UNAVAILABLE":
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Email tersebut sudah digunakan oleh akun lain.",
+      );
+
+    case "EMAIL_CHANGE_NOT_FOUND":
+      return createErrorResponse(
+        404,
+        API_ERROR_CODES.NOT_FOUND,
+        "Tidak ada perubahan email yang menunggu verifikasi.",
+      );
+
+    case "EMAIL_CHANGE_TOKEN_INVALID":
+      return createErrorResponse(
+        400,
+        API_ERROR_CODES.VALIDATION_ERROR,
+        "Link verifikasi email tidak valid.",
+      );
+
+    case "EMAIL_CHANGE_TOKEN_EXPIRED":
+      return createErrorResponse(
+        410,
+        API_ERROR_CODES.VALIDATION_ERROR,
+        "Link verifikasi email sudah kedaluwarsa.",
+      );
+
+    case "EMAIL_DELIVERY_FAILED":
+      return createErrorResponse(
+        502,
+        API_ERROR_CODES.EXTERNAL_API_ERROR,
+        "Email verifikasi tidak dapat dikirim. Silakan coba lagi.",
+      );
+
     case "AUTH_REQUIRED":
       return createErrorResponse(
         401,
