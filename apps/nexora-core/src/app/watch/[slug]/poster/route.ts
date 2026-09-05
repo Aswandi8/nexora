@@ -31,7 +31,7 @@ function createOverlaySvg(): Buffer {
       />
 
       <path
-        d="M580 300 L580 375 L645 337.5 Z"
+        d="M586 309 L586 366 L633 337.5 Z"
         fill="#ffffff"
       />
     </svg>
@@ -104,15 +104,11 @@ export async function GET(_request: Request, context: PosterRouteContext) {
 
     return new Response(new Uint8Array(poster), {
       status: 200,
-
       headers: {
         "Content-Type": "image/jpeg",
-
         "Content-Length": String(poster.byteLength),
-
         "Cache-Control":
           "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
-
         "X-Content-Type-Options": "nosniff",
       },
     });
@@ -124,7 +120,6 @@ export async function GET(_request: Request, context: PosterRouteContext) {
 
     return new Response(null, {
       status: 502,
-
       headers: {
         "Cache-Control": "no-store",
       },
