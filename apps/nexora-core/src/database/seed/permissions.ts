@@ -13,6 +13,7 @@ export const CURRENT_PERMISSION_CODES = [
   PERMISSIONS.USERS_CREATE,
   PERMISSIONS.USERS_UPDATE,
   PERMISSIONS.USERS_DELETE,
+  PERMISSIONS.USERS_ASSIGN_ROLE,
 
   PERMISSIONS.ROLES_READ,
   PERMISSIONS.ROLES_CREATE,
@@ -59,6 +60,11 @@ const PERMISSION_SEEDS: PermissionSeed[] = [
     code: PERMISSIONS.USERS_DELETE,
     name: "Delete Users",
     description: "Delete users.",
+  },
+  {
+    code: PERMISSIONS.USERS_ASSIGN_ROLE,
+    name: "Assign User Roles",
+    description: "Assign or change roles for users.",
   },
 
   {

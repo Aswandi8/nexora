@@ -9,12 +9,10 @@ import {
 
 import { revalidatePath } from "next/cache";
 
+import { actionFailure, type ActionResult } from "@/lib/actions/action-result";
 import { serverApiRequest } from "@/lib/api/server";
 
-export type RoleActionResult = {
-  success: boolean;
-  message?: string;
-};
+export type RoleActionResult = ActionResult;
 
 export async function createRoleAction(
   input: CreateRoleInput,
@@ -29,19 +27,13 @@ export async function createRoleAction(
     });
 
     revalidatePath("/roles");
-
     revalidatePath("/dashboard");
 
     return {
       success: true,
     };
   } catch (error) {
-    console.error(error);
-
-    return {
-      success: false,
-      message: "Unable to create role.",
-    };
+    return actionFailure(error, "Role tidak dapat dibuat.");
   }
 }
 
@@ -59,23 +51,15 @@ export async function updateRoleAction(
     });
 
     revalidatePath("/roles");
-
     revalidatePath(`/roles/${id}`);
-
     revalidatePath(`/roles/${id}/edit`);
-
     revalidatePath("/dashboard");
 
     return {
       success: true,
     };
   } catch (error) {
-    console.error(error);
-
-    return {
-      success: false,
-      message: "Unable to update role.",
-    };
+    return actionFailure(error, "Role tidak dapat diperbarui.");
   }
 }
 
@@ -87,18 +71,12 @@ export async function deleteRoleAction(id: string): Promise<RoleActionResult> {
     });
 
     revalidatePath("/roles");
-
     revalidatePath("/dashboard");
 
     return {
       success: true,
     };
   } catch (error) {
-    console.error(error);
-
-    return {
-      success: false,
-      message: "Unable to delete role.",
-    };
+    return actionFailure(error, "Role tidak dapat dihapus.");
   }
 }

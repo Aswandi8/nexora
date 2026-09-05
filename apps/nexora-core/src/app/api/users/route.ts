@@ -31,6 +31,11 @@ export async function POST(request: Request) {
     requirePermission(authContext, PERMISSIONS.USERS_CREATE);
 
     const body = await request.json();
+
+    if (Object.prototype.hasOwnProperty.call(body, "roleId")) {
+      requirePermission(authContext, PERMISSIONS.USERS_ASSIGN_ROLE);
+    }
+
     const result = await createUser(body);
 
     invalidateDashboardCache();
@@ -42,9 +47,6 @@ export async function POST(request: Request) {
       resource: "USER",
       resourceId: result.id,
       changedFields: Object.keys(body ?? {}),
-      metadata: {
-        resourceLabel: result.name,
-      },
     });
 
     return apiSuccess(result, 201);

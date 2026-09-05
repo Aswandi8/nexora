@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { ErrorPage } from "@/components/feedback/error-page";
 
 interface ErrorProps {
@@ -11,16 +9,12 @@ interface ErrorProps {
   reset: () => void;
 }
 
-export default function Error({ error, reset }: ErrorProps) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
+export default function Error({ reset }: ErrorProps) {
   return (
     <ErrorPage
       code="500"
-      title="Something went wrong"
-      description="Nexora encountered an unexpected error. Please try again."
+      title="Terjadi kesalahan"
+      description="Nexora mengalami kesalahan yang tidak terduga. Silakan coba kembali."
       onRetry={reset}
     />
   );

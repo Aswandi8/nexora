@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-
 import { ErrorPage } from "@/components/feedback/error-page";
 
 interface GlobalErrorProps {
@@ -11,18 +9,14 @@ interface GlobalErrorProps {
   reset: () => void;
 }
 
-export default function GlobalError({ error, reset }: GlobalErrorProps) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
+export default function GlobalError({ reset }: GlobalErrorProps) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body>
         <ErrorPage
           code="500"
-          title="Nexora is unavailable"
-          description="A critical error occurred while loading the console."
+          title="Nexora tidak tersedia"
+          description="Terjadi kesalahan kritis saat memuat Nexora Console."
           showBackButton={false}
           homeHref="/"
           onRetry={reset}

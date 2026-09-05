@@ -17,15 +17,11 @@ import { signInWithEmail } from "./auth.client";
 
 export function LoginForm() {
   const router = useRouter();
-
   const { toast } = useToast();
 
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [isPreparing, setIsPreparing] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -46,19 +42,20 @@ export function LoginForm() {
       setIsPreparing(true);
 
       toast({
-        title: "Signed in",
-        description: "Welcome back to Nexora Console.",
+        title: "Berhasil masuk",
+        description: "Selamat datang kembali di Nexora Console.",
         variant: "success",
       });
 
       router.replace("/dashboard");
-
       router.refresh();
     } catch (error) {
       toast({
-        title: "Sign in failed",
+        title: "Gagal masuk",
         description:
-          error instanceof Error ? error.message : "Unable to sign in.",
+          error instanceof Error
+            ? error.message
+            : "Autentikasi tidak dapat diproses.",
         variant: "destructive",
       });
 
@@ -72,7 +69,7 @@ export function LoginForm() {
 
   return (
     <form className="grid gap-5" onSubmit={handleSubmit}>
-      <FormField label="Email address" htmlFor="email">
+      <FormField label="Alamat email" htmlFor="email">
         <div className="relative">
           <Mail
             aria-hidden="true"
@@ -84,7 +81,7 @@ export function LoginForm() {
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="anda@example.com"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -99,7 +96,7 @@ export function LoginForm() {
           id="password"
           name="password"
           autoComplete="current-password"
-          placeholder="Enter your password"
+          placeholder="Masukkan password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
@@ -113,7 +110,7 @@ export function LoginForm() {
         className="mt-1 h-12 w-full rounded-xl bg-brand-300 text-base font-semibold text-brand-900 shadow-[0_8px_24px_-12px_var(--brand-300)] transition-all hover:bg-brand-500 hover:shadow-[0_10px_30px_-12px_var(--brand-500)]"
         disabled={isSubmitting}
       >
-        {isSubmitting ? "Signing in..." : "Sign in"}
+        {isSubmitting ? "Memproses..." : "Masuk"}
       </Button>
     </form>
   );

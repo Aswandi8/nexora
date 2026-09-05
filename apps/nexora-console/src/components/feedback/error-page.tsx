@@ -6,7 +6,6 @@ import Link from "next/link";
 import { ArrowLeft, Home } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-
 import { Typography } from "@/components/ui/typography";
 
 import { cn } from "@/lib/utils";
@@ -76,13 +75,13 @@ export function ErrorPage({
               onClick={() => history.back()}
             >
               <ArrowLeft className="size-4" />
-              Go back
+              Kembali
             </Button>
           ) : null}
 
           {onRetry ? (
             <Button type="button" onClick={onRetry}>
-              Try again
+              Coba lagi
             </Button>
           ) : (
             <Link href={homeHref} className={cn(buttonVariants())}>

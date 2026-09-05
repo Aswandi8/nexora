@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { LogOut } from "lucide-react";
-
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ export function LogoutButton({
   className,
 }: LogoutButtonProps) {
   const router = useRouter();
-
   const { toast } = useToast();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,8 +38,8 @@ export function LogoutButton({
       await signOut();
 
       toast({
-        title: "Signed out",
-        description: "Your Nexora session has ended.",
+        title: "Berhasil keluar",
+        description: "Sesi Nexora Anda telah berakhir.",
         variant: "success",
       });
 
@@ -49,9 +47,11 @@ export function LogoutButton({
       router.refresh();
     } catch (error) {
       toast({
-        title: "Sign out failed",
+        title: "Gagal keluar",
         description:
-          error instanceof Error ? error.message : "Unable to sign out.",
+          error instanceof Error
+            ? error.message
+            : "Proses keluar tidak dapat diselesaikan.",
         variant: "destructive",
       });
 
@@ -71,8 +71,7 @@ export function LogoutButton({
         )}
       >
         <LogOut aria-hidden="true" className="size-4" />
-
-        <span>{isSubmitting ? "Signing out..." : "Sign out"}</span>
+        <span>{isSubmitting ? "Memproses..." : "Keluar"}</span>
       </button>
     );
   }
@@ -87,8 +86,7 @@ export function LogoutButton({
       className={className}
     >
       <LogOut className="size-4" />
-
-      {isSubmitting ? "Signing out..." : "Sign out"}
+      {isSubmitting ? "Memproses..." : "Keluar"}
     </Button>
   );
 }
