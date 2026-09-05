@@ -58,13 +58,33 @@ function getGeneratedPosterUrl(
   return url.toString();
 }
 
+function formatDisplayDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+
+  const hours = Math.floor(totalSeconds / 3600);
+
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0",
+    )}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0",
+  )}`;
+}
+
 export function renderPublicShortlinkHtml({
   shortlink,
   canonicalUrl,
 }: PublicShortlinkRenderContext): string {
-  const title = shortlink.title || shortlink.slug;
-
-  const description = shortlink.description ?? title;
+  const fakeDuration = formatDisplayDuration(shortlink.displayDurationMs);
 
   const destinationUrl = normalizePublicHttpUrl(shortlink.destinationUrl);
 
@@ -93,9 +113,7 @@ export function renderPublicShortlinkHtml({
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
 
-  <title>${escapeHtml(title)}</title>
-
-  ${metaName("description", description)}
+  <title>${escapeHtml(fakeDuration)}</title>
 
   <link
     rel="canonical"
@@ -106,9 +124,7 @@ export function renderPublicShortlinkHtml({
 
   ${metaProperty("og:url", destinationUrl)}
 
-  ${metaProperty("og:title", title)}
-
-  ${metaProperty("og:description", description)}
+  ${metaProperty("og:title", fakeDuration)}
 
   ${metaProperty("og:image", socialImageUrl)}
 
@@ -120,22 +136,20 @@ export function renderPublicShortlinkHtml({
 
   ${metaProperty("og:image:height", "675")}
 
-  ${metaProperty("og:image:alt", title)}
+  ${metaProperty("og:image:alt", fakeDuration)}
 
   ${metaName("twitter:card", "summary_large_image")}
 
-  ${metaName("twitter:title", title)}
-
-  ${metaName("twitter:description", description)}
+  ${metaName("twitter:title", fakeDuration)}
 
   ${metaName("twitter:image", socialImageUrl)}
 
-  ${metaName("twitter:image:alt", title)}
+  ${metaName("twitter:image:alt", fakeDuration)}
 </head>
 
 <body>
   <a href="${escapeAttribute(destinationUrl)}">
-    ${escapeHtml(title)}
+    ${escapeHtml(fakeDuration)}
   </a>
 </body>
 </html>`;

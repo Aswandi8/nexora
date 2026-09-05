@@ -15,40 +15,7 @@ const POSTER_HEIGHT = 675;
 const POSTER_MAX_BYTES = 25 * 1024 * 1024;
 const POSTER_TIMEOUT_MS = 15_000;
 
-function formatDisplayDuration(durationMs: number): string {
-  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
-
-  const hours = Math.floor(totalSeconds / 3600);
-
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-      2,
-      "0",
-    )}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-    2,
-    "0",
-  )}`;
-}
-
-function escapeSvg(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function createOverlaySvg(displayDurationMs: number): Buffer {
-  const duration = escapeSvg(formatDisplayDuration(displayDurationMs));
-
+function createOverlaySvg(): Buffer {
   return Buffer.from(`
     <svg
       width="${POSTER_WIDTH}"
@@ -67,27 +34,6 @@ function createOverlaySvg(displayDurationMs: number): Buffer {
         d="M580 300 L580 375 L645 337.5 Z"
         fill="#ffffff"
       />
-
-      <rect
-        x="1040"
-        y="593"
-        width="120"
-        height="50"
-        rx="9"
-        fill="rgba(0,0,0,0.78)"
-      />
-
-      <text
-        x="1100"
-        y="626"
-        fill="#ffffff"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="25"
-        font-weight="700"
-        text-anchor="middle"
-      >
-        ${duration}
-      </text>
     </svg>
   `);
 }
@@ -134,8 +80,6 @@ export async function GET(_request: Request, context: PosterRouteContext) {
       userAgent: "Nexora-Social-Poster/1.0",
     });
 
-    const overlay = createOverlaySvg(shortlink.displayDurationMs);
-
     const poster = await sharp(downloadedMedia.filePath, {
       failOn: "error",
       limitInputPixels: false,
@@ -147,7 +91,7 @@ export async function GET(_request: Request, context: PosterRouteContext) {
       })
       .composite([
         {
-          input: overlay,
+          input: createOverlaySvg(),
           top: 0,
           left: 0,
         },
