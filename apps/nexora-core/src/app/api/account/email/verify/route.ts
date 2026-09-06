@@ -1,18 +1,17 @@
 import { verifyAccountEmailChangeResultSchema } from "@nexora/contracts";
+import { z } from "zod";
 
 import { apiError, apiSuccess } from "@/lib/api/api-response";
 import { writeSystemAuditLog } from "@/lib/audit";
 import { verifyOwnEmailChange } from "@/modules/account";
 
-export async function GET(request: Request) {
+const verifyEmailChangeInputSchema = z.object({
+  token: z.string().trim().min(1).max(256),
+});
+
+export async function POST(request: Request) {
   try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
-
-    if (!token) {
-      throw new Error("EMAIL_CHANGE_TOKEN_INVALID");
-    }
-
+    const { token } = verifyEmailChangeInputSchema.parse(await request.json());
     const result = await verifyOwnEmailChange(token);
 
     await writeSystemAuditLog({

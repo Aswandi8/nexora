@@ -1,13 +1,24 @@
-import { findActivePublicShortlinkBySlug } from "./public-shortlink.repository";
+import { shortlinkSlugSchema } from "@nexora/contracts";
 
 import { mapPublicShortlink } from "./public-shortlink.mapper";
+import { findActivePublicShortlinkBySlug } from "./public-shortlink.repository";
 
 import type { PublicShortlink } from "./public-shortlink.types";
+
+function normalizePublicSlug(slug: string): string | null {
+  const result = shortlinkSlugSchema.safeParse(slug);
+
+  if (!result.success) {
+    return null;
+  }
+
+  return result.data;
+}
 
 export async function getPublicShortlinkBySlug(
   slug: string,
 ): Promise<PublicShortlink | null> {
-  const normalizedSlug = slug.trim().toLowerCase();
+  const normalizedSlug = normalizePublicSlug(slug);
 
   if (!normalizedSlug) {
     return null;

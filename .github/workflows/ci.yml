@@ -18,31 +18,67 @@ jobs:
   verify:
     name: Verify Nexora
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: nexora_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexora_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       CI: "true"
+      NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
 
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/nexora_ci?sslmode=disable
 
       BETTER_AUTH_URL: http://localhost:3000
       BETTER_AUTH_SECRET: nexora-ci-only-secret-not-for-production
+
+      NEXORA_PUBLIC_URL: http://localhost:3000
+      NEXORA_CORE_URL: http://localhost:3000
       NEXORA_CONSOLE_URL: http://localhost:3001
 
-      NEXORA_CORE_URL: http://localhost:3000
+      NEXORA_ADMIN_NAME: Nexora CI Admin
+      NEXORA_ADMIN_EMAIL: nexora-ci@example.com
+      NEXORA_ADMIN_PASSWORD: Nexora-CI-Password-Only-123!
+
+      RESEND_API_KEY: re_ci_placeholder
+      NEXORA_EMAIL_FROM: Nexora CI <noreply@example.com>
+
+      SHORTLINK_MEDIA_MAX_BYTES: "262144000"
+      SHORTLINK_MEDIA_TIMEOUT_MS: "30000"
+
+      SMOKE_TIMEOUT_MS: "10000"
+      SMOKE_STARTUP_TIMEOUT_MS: "30000"
+      SMOKE_STARTUP_POLL_MS: "1000"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Setup pnpm and Node.js
-        uses: pnpm/setup@v2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
         with:
           version: 11.24.0
-          runtime: node@24.19.0
-          cache: true
-          install: false
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Verify toolchain
         run: |
@@ -52,8 +88,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run readiness guards
+        run: pnpm audit:readiness
+
       - name: Generate Prisma Client
         run: pnpm db:generate
+
+      - name: Run security and regression tests
+        run: pnpm --filter nexora-core exec tsx --test tests/*.test.ts
+
+      - name: Apply database migrations
+        run: pnpm db:migrate:deploy
+
+      - name: Verify database migration status
+        run: pnpm db:migrate:status
 
       - name: Typecheck and lint
         run: pnpm check
@@ -63,3 +111,38 @@ jobs:
 
       - name: Build Console
         run: pnpm build:console
+
+      - name: Start production servers
+        shell: bash
+        run: |
+          pnpm --filter nexora-core start > /tmp/nexora-core.log 2>&1 &
+          echo $! > /tmp/nexora-core.pid
+
+          pnpm --filter nexora-console start > /tmp/nexora-console.log 2>&1 &
+          echo $! > /tmp/nexora-console.pid
+
+      - name: Run production smoke tests
+        run: pnpm test:smoke
+
+      - name: Print server logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== nexora-core ====="
+          cat /tmp/nexora-core.log 2>/dev/null || true
+
+          echo ""
+          echo "===== nexora-console ====="
+          cat /tmp/nexora-console.log 2>/dev/null || true
+
+      - name: Stop production servers
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/nexora-core.pid ]; then
+            kill "$(cat /tmp/nexora-core.pid)" 2>/dev/null || true
+          fi
+
+          if [ -f /tmp/nexora-console.pid ]; then
+            kill "$(cat /tmp/nexora-console.pid)" 2>/dev/null || true
+          fi

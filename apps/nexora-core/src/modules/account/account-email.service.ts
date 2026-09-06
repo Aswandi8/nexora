@@ -43,7 +43,13 @@ function getConsoleUrl(): string {
     throw new Error("NEXORA_CONSOLE_URL is not configured");
   }
 
-  return value.replace(/\/+$/, "");
+  const url = new URL(value);
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("NEXORA_CONSOLE_URL must use http or https");
+  }
+
+  return url.origin;
 }
 
 function createVerificationUrl(token: string): string {
@@ -110,17 +116,17 @@ export async function requestOwnEmailChange(
   const token = createToken();
   const expiresAt = new Date(Date.now() + EMAIL_CHANGE_EXPIRY_MS);
 
-  await sendEmailChangeVerification({
-    to: normalizedEmail,
-    name,
-    verificationUrl: createVerificationUrl(token),
-  });
-
   const pending = await accountEmailRepository.upsertPending({
     userId,
     newEmail: normalizedEmail,
     tokenHash: hashToken(token),
     expiresAt,
+  });
+
+  await sendEmailChangeVerification({
+    to: normalizedEmail,
+    name,
+    verificationUrl: createVerificationUrl(token),
   });
 
   return {
@@ -151,17 +157,17 @@ export async function resendOwnEmailChange(
   const token = createToken();
   const expiresAt = new Date(Date.now() + EMAIL_CHANGE_EXPIRY_MS);
 
-  await sendEmailChangeVerification({
-    to: pending.newEmail,
-    name: pending.user.name,
-    verificationUrl: createVerificationUrl(token),
-  });
-
   const updated = await accountEmailRepository.updateToken(
     pending.id,
     hashToken(token),
     expiresAt,
   );
+
+  await sendEmailChangeVerification({
+    to: updated.newEmail,
+    name: pending.user.name,
+    verificationUrl: createVerificationUrl(token),
+  });
 
   return {
     pendingChange: {

@@ -1,20 +1,35 @@
 const CORE_URL = normalizeBaseUrl(
   process.env.NEXORA_CORE_URL ?? "http://localhost:3000",
 );
+
 const CONSOLE_URL = normalizeBaseUrl(
   process.env.NEXORA_CONSOLE_URL ?? "http://localhost:3001",
 );
-const REQUEST_TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 10000);
-const STARTUP_TIMEOUT_MS = Number(
-  process.env.SMOKE_STARTUP_TIMEOUT_MS ?? 30000,
+
+const REQUEST_TIMEOUT_MS = parsePositiveInteger(
+  process.env.SMOKE_TIMEOUT_MS,
+  10000,
 );
-const STARTUP_POLL_MS = Number(process.env.SMOKE_STARTUP_POLL_MS ?? 1000);
+
+const STARTUP_TIMEOUT_MS = parsePositiveInteger(
+  process.env.SMOKE_STARTUP_TIMEOUT_MS,
+  30000,
+);
+
+const STARTUP_POLL_MS = parsePositiveInteger(
+  process.env.SMOKE_STARTUP_POLL_MS,
+  1000,
+);
 
 const tests = [
   {
     name: "Core liveness",
     url: `${CORE_URL}/api/health/live`,
     expectedStatuses: [200],
+    expectedHeaders: {
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+    },
   },
   {
     name: "Core readiness",
@@ -32,9 +47,18 @@ const tests = [
     expectedStatuses: [401, 403],
   },
   {
+    name: "Email verification cannot mutate through GET",
+    url: `${CORE_URL}/api/account/email/verify?token=smoke-test`,
+    expectedStatuses: [405],
+  },
+  {
     name: "Console login page",
     url: `${CONSOLE_URL}/login`,
     expectedStatuses: [200],
+    expectedHeaders: {
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+    },
   },
 ];
 
@@ -54,23 +78,7 @@ try {
 }
 
 for (const test of tests) {
-  try {
-    const response = await fetchWithTimeout(test.url);
-    const passed = test.expectedStatuses.includes(response.status);
-
-    if (passed) {
-      console.log(`PASS  ${test.name} -> HTTP ${response.status}`);
-      continue;
-    }
-
-    failed++;
-    console.error(
-      `FAIL  ${test.name} -> HTTP ${response.status}, expected ${test.expectedStatuses.join(" or ")}`,
-    );
-  } catch (error) {
-    failed++;
-    console.error(`FAIL  ${test.name} -> ${formatError(error)}`);
-  }
+  await runTest(test);
 }
 
 console.log("");
@@ -84,8 +92,40 @@ console.log(
   `Smoke test passed: ${tests.length}/${tests.length} test(s) passed.`,
 );
 
-function normalizeBaseUrl(value) {
-  return value.replace(/\/+$/, "");
+async function runTest(test) {
+  try {
+    const response = await fetchWithTimeout(test.url);
+    const problems = [];
+
+    if (!test.expectedStatuses.includes(response.status)) {
+      problems.push(
+        `HTTP ${response.status}, expected ${test.expectedStatuses.join(" or ")}`,
+      );
+    }
+
+    for (const [headerName, expectedValue] of Object.entries(
+      test.expectedHeaders ?? {},
+    )) {
+      const actualValue = response.headers.get(headerName);
+
+      if (actualValue !== expectedValue) {
+        problems.push(
+          `${headerName}=${JSON.stringify(actualValue)}, expected ${JSON.stringify(expectedValue)}`,
+        );
+      }
+    }
+
+    if (problems.length === 0) {
+      console.log(`PASS  ${test.name} -> HTTP ${response.status}`);
+      return;
+    }
+
+    failed++;
+    console.error(`FAIL  ${test.name} -> ${problems.join("; ")}`);
+  } catch (error) {
+    failed++;
+    console.error(`FAIL  ${test.name} -> ${formatError(error)}`);
+  }
 }
 
 async function waitForServer(url, name) {
@@ -99,7 +139,9 @@ async function waitForServer(url, name) {
         console.log(`READY ${name} -> HTTP ${response.status}`);
         return;
       }
-    } catch {}
+    } catch {
+      // Server may still be starting.
+    }
 
     await delay(STARTUP_POLL_MS);
   }
@@ -111,6 +153,7 @@ async function waitForServer(url, name) {
 
 async function fetchWithTimeout(url) {
   const controller = new AbortController();
+
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
@@ -126,6 +169,27 @@ async function fetchWithTimeout(url) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizeBaseUrl(value) {
+  const url = new URL(value);
+  return url.toString().replace(/\/+$/, "");
+}
+
+function parsePositiveInteger(value, fallback) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(
+      `Expected positive integer but received ${JSON.stringify(value)}`,
+    );
+  }
+
+  return parsed;
 }
 
 function delay(ms) {

@@ -19,15 +19,44 @@ export const displayDurationMsSchema = z
 
 export const durationPartSchema = z.number().int().min(0).max(59);
 
+export const shortlinkSlugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Slug may only contain lowercase letters, numbers, and hyphens.",
+  );
+
+export const httpUrlSchema = z
+  .string()
+  .trim()
+  .url()
+  .refine(
+    (value) => {
+      try {
+        const url = new URL(value);
+
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    {
+      message: "URL must use HTTP or HTTPS.",
+    },
+  );
+
 export const shortlinkSchema = z.object({
   id: z.string(),
-  slug: z.string().min(1).max(100),
-  destinationUrl: z.string().url(),
+  slug: shortlinkSlugSchema,
+  destinationUrl: httpUrlSchema,
   title: z.string().min(1).max(255),
   description: z.string().max(1000).nullable(),
   mediaType: shortlinkMediaTypeSchema,
-  mediaUrl: z.string().url(),
-  posterUrl: z.string().url().nullable(),
+  mediaUrl: httpUrlSchema,
+  posterUrl: httpUrlSchema.nullable(),
   mediaWidth: z.number().int().positive(),
   mediaHeight: z.number().int().positive(),
   durationMs: z.number().int().nonnegative().nullable(),
@@ -58,19 +87,11 @@ export const shortlinkListQuerySchema = z.object({
 });
 
 const shortlinkWriteFields = {
-  slug: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100)
-    .regex(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Slug may only contain lowercase letters, numbers, and hyphens.",
-    ),
-  destinationUrl: z.string().trim().url(),
+  slug: shortlinkSlugSchema,
+  destinationUrl: httpUrlSchema,
   title: z.string().trim().min(1).max(255),
   description: z.string().trim().max(1000).nullable().optional(),
-  mediaUrl: z.string().trim().url(),
+  mediaUrl: httpUrlSchema,
   displayDurationMs: displayDurationMsSchema,
   status: shortlinkStatusSchema.default("ACTIVE"),
 };

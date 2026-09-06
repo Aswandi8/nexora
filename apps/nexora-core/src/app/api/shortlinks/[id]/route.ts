@@ -7,13 +7,18 @@ import {
   getAuditChangedFields,
   writeAuditLog,
 } from "@/lib/audit";
+import { invalidateDashboardCache } from "@/lib/cache/cache-invalidation";
 import {
   deleteShortlink,
   getShortlinkById,
   updateShortlink,
 } from "@/modules/shortlinks";
 
-type RouteContext = { params: Promise<{ id: string }> };
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -77,6 +82,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
+    invalidateDashboardCache();
+
     await writeAuditLog({
       request,
       actor: authContext,
@@ -103,6 +110,8 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     const { id } = await context.params;
     const result = await deleteShortlink(id);
+
+    invalidateDashboardCache();
 
     await writeAuditLog({
       request,

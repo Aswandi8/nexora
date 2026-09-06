@@ -14,13 +14,14 @@
     "lint:core": "pnpm --filter nexora-core lint",
     "lint:console": "pnpm --filter nexora-console lint",
     "check": "pnpm typecheck:core && pnpm typecheck:console && pnpm lint:core && pnpm lint:console",
+    "test:core": "pnpm --filter nexora-core test",
     "test:smoke": "node scripts/smoke.mjs",
     "audit:readiness": "node scripts/readiness.mjs",
     "db:generate": "pnpm --filter nexora-core exec prisma generate",
     "db:migrate:status": "pnpm --filter nexora-core exec prisma migrate status",
     "db:migrate:deploy": "pnpm --filter nexora-core exec prisma migrate deploy",
     "db:seed": "pnpm --filter nexora-core exec tsx prisma/seed.ts",
-    "release:verify": "pnpm check && pnpm build:core && pnpm build:console"
+    "release:verify": "pnpm audit:readiness && pnpm db:generate && pnpm db:migrate:status && pnpm test:core && pnpm check && pnpm build"
   },
   "keywords": [],
   "author": "",

@@ -3,11 +3,10 @@ import {
   type ApiErrorCode,
   type ApiResponse,
 } from "@nexora/contracts";
+import { ZodError } from "zod";
 
 import { Prisma } from "@/generated/prisma/client";
 import { logger } from "@/lib/observability/logger";
-
-import { ZodError } from "zod";
 
 function createErrorResponse(
   status: number,
@@ -322,6 +321,43 @@ function mapKnownApplicationError(error: Error): Response | null {
   }
 }
 
+function mapKnownPrismaError(
+  error: Prisma.PrismaClientKnownRequestError,
+): Response | null {
+  switch (error.code) {
+    case "P2002":
+      /*
+       * Unique constraint collision.
+       *
+       * Contoh:
+       * - slug sudah digunakan
+       * - email sudah digunakan
+       *
+       * Ini conflict data, bukan database outage.
+       */
+      return createErrorResponse(
+        409,
+        API_ERROR_CODES.CONFLICT,
+        "Data tersebut sudah digunakan.",
+      );
+
+    case "P2025":
+      /*
+       * Record yang hendak diubah/hapus sudah tidak tersedia.
+       *
+       * Jangan jadikan kondisi ini DATABASE_ERROR 500.
+       */
+      return createErrorResponse(
+        404,
+        API_ERROR_CODES.NOT_FOUND,
+        "Data yang diminta tidak ditemukan.",
+      );
+
+    default:
+      return null;
+  }
+}
+
 export function apiError(error: unknown): Response {
   if (error instanceof ZodError) {
     return createErrorResponse(
@@ -341,6 +377,17 @@ export function apiError(error: unknown): Response {
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const knownPrismaError = mapKnownPrismaError(error);
+
+    if (knownPrismaError) {
+      logger.warn("database_request_conflict", {
+        code: error.code,
+        target: error.meta?.target,
+      });
+
+      return knownPrismaError;
+    }
+
     logger.error("database_request_failed", {
       code: error.code,
       target: error.meta?.target,

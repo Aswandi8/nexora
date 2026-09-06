@@ -3,6 +3,7 @@ import { PERMISSIONS } from "@nexora/contracts";
 import { authenticateAdminRequest, requirePermission } from "@/auth";
 import { apiError, apiSuccess } from "@/lib/api/api-response";
 import { writeAuditLog } from "@/lib/audit";
+import { invalidateDashboardCache } from "@/lib/cache/cache-invalidation";
 import { createShortlink, listShortlinks } from "@/modules/shortlinks";
 
 export async function GET(request: Request) {
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
     requirePermission(authContext, PERMISSIONS.SHORTLINKS_READ);
 
     const url = new URL(request.url);
+
     const result = await listShortlinks({
       page: url.searchParams.get("page") ?? undefined,
       limit: url.searchParams.get("limit") ?? undefined,
@@ -32,6 +34,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const result = await createShortlink(body);
+
+    invalidateDashboardCache();
 
     await writeAuditLog({
       request,

@@ -1,7 +1,6 @@
+import { logger } from "@/lib/observability/logger";
 import { renderPublicShortlinkHtml } from "@/modules/shortlinks/public/public-shortlink-html";
-
 import { createPublicStatusHtml } from "@/modules/shortlinks/public/public-shortlink-html.utils";
-
 import { getPublicShortlinkBySlug } from "@/modules/shortlinks/public/public-shortlink.service";
 
 interface WatchRouteContext {
@@ -10,53 +9,26 @@ interface WatchRouteContext {
   }>;
 }
 
-function getFirstForwardedValue(value: string | null): string | null {
+function getConfiguredPublicOrigin(): string {
+  const value =
+    process.env.NEXORA_PUBLIC_URL?.trim() ||
+    process.env.BETTER_AUTH_URL?.trim();
+
   if (!value) {
-    return null;
+    throw new Error("NEXORA_PUBLIC_URL is not configured");
   }
 
-  const firstValue = value.split(",")[0]?.trim();
+  const url = new URL(value);
 
-  return firstValue || null;
-}
-
-function getPublicOrigin(request: Request): string {
-  const requestUrl = new URL(request.url);
-
-  const forwardedProto = getFirstForwardedValue(
-    request.headers.get("x-forwarded-proto"),
-  );
-
-  const forwardedHost = getFirstForwardedValue(
-    request.headers.get("x-forwarded-host"),
-  );
-
-  const host = getFirstForwardedValue(request.headers.get("host"));
-
-  const protocol =
-    forwardedProto === "https" || forwardedProto === "http"
-      ? forwardedProto
-      : requestUrl.protocol.replace(":", "");
-
-  const publicHost = forwardedHost ?? host ?? requestUrl.host;
-
-  try {
-    const origin = new URL(`${protocol}://${publicHost}`);
-
-    if (origin.protocol !== "http:" && origin.protocol !== "https:") {
-      return requestUrl.origin;
-    }
-
-    return origin.origin;
-  } catch {
-    return requestUrl.origin;
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("NEXORA_PUBLIC_URL must use http or https");
   }
+
+  return url.origin;
 }
 
 function isXCardCrawler(request: Request): boolean {
-  const userAgent = request.headers.get("user-agent") ?? "";
-
-  return /Twitterbot/i.test(userAgent);
+  return /Twitterbot/i.test(request.headers.get("user-agent") ?? "");
 }
 
 export async function GET(request: Request, context: WatchRouteContext) {
@@ -67,14 +39,10 @@ export async function GET(request: Request, context: WatchRouteContext) {
   try {
     shortlink = await getPublicShortlinkBySlug(slug);
   } catch (error) {
-    console.error("Failed to load public shortlink", {
-      slug,
-      error,
-    });
+    logger.error("shortlink.public.lookup_failed", { slug, error });
 
     return new Response(createPublicStatusHtml("Service unavailable"), {
       status: 503,
-
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
@@ -88,7 +56,6 @@ export async function GET(request: Request, context: WatchRouteContext) {
   if (!shortlink) {
     return new Response(createPublicStatusHtml("Shortlink not found"), {
       status: 404,
-
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "public, max-age=60",
@@ -102,7 +69,24 @@ export async function GET(request: Request, context: WatchRouteContext) {
     return Response.redirect(shortlink.destinationUrl, 302);
   }
 
-  const publicOrigin = getPublicOrigin(request);
+  let publicOrigin: string;
+
+  try {
+    publicOrigin = getConfiguredPublicOrigin();
+  } catch (error) {
+    logger.error("shortlink.public.origin_invalid", { slug, error });
+
+    return new Response(createPublicStatusHtml("Service unavailable"), {
+      status: 503,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Retry-After": "30",
+        "X-Robots-Tag": "noindex, nofollow",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
 
   const canonicalUrl = new URL(
     `/watch/${encodeURIComponent(shortlink.slug)}`,
@@ -116,15 +100,11 @@ export async function GET(request: Request, context: WatchRouteContext) {
 
   return new Response(html, {
     status: 200,
-
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-
       "Cache-Control":
         "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
-
       "X-Content-Type-Options": "nosniff",
-
       "Referrer-Policy": "strict-origin-when-cross-origin",
     },
   });
