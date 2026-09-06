@@ -1,3 +1,8 @@
+import {
+  AuthAccountRejectedError,
+  decideAuthContext,
+} from "./auth-login-policy";
+
 export interface SignInInput {
   email: string;
   password: string;
@@ -32,8 +37,22 @@ interface AuthContextFailure {
 }
 
 const AUTH_REQUEST_TIMEOUT_MS = 15_000;
-const SESSION_READY_ATTEMPTS = 5;
-const SESSION_READY_DELAY_MS = 250;
+
+/*
+ * Total enam verification attempts.
+ *
+ * Request pertama langsung dilakukan. Delay hanya digunakan sebelum
+ * request berikutnya:
+ *
+ * 150ms
+ * 300ms
+ * 500ms
+ * 750ms
+ * 1000ms
+ *
+ * Total backoff nominal = 2.7 detik.
+ */
+const SESSION_READY_DELAYS_MS = [150, 300, 500, 750, 1_000] as const;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -200,11 +219,24 @@ async function clearSignInSession(): Promise<void> {
   try {
     await signOut();
   } catch {
-    // Best-effort cleanup. Error utama tetap status akun.
+    /*
+     * Best-effort cleanup.
+     *
+     * Cleanup hanya dipanggil untuk definitive account rejection.
+     * Error cleanup tidak boleh menggantikan error policy akun utama.
+     */
   }
 }
 
-async function validateSignedInAccount(): Promise<void> {
+/*
+ * Return:
+ *
+ * true  = session/context sudah terverifikasi.
+ * false = kondisi transient; boleh dicoba kembali.
+ *
+ * Throw AuthAccountRejectedError hanya untuk definitive account rejection.
+ */
+async function validateSignedInAccount(): Promise<boolean> {
   const response = await authFetch("/api/auth/context", {
     method: "GET",
     credentials: "same-origin",
@@ -212,80 +244,72 @@ async function validateSignedInAccount(): Promise<void> {
   });
 
   if (response.ok) {
-    return;
+    return true;
   }
 
   const payload = await readAuthContextFailure(response);
 
-  if (payload?.error.code === "ACCOUNT_INACTIVE") {
-    throw new Error(
-      "Akun Anda tidak aktif. Hubungi administrator untuk mengaktifkan kembali akun.",
-    );
+  const decision = decideAuthContext({
+    status: response.status,
+    code: payload?.error.code,
+    message: payload?.error.message,
+  });
+
+  if (decision.kind === "ready") {
+    return true;
   }
 
-  if (payload?.error.code === "ACCOUNT_SUSPENDED") {
-    throw new Error(
-      "Akun Anda ditangguhkan. Hubungi administrator untuk informasi lebih lanjut.",
-    );
+  if (decision.kind === "reject") {
+    throw new AuthAccountRejectedError(decision.message);
   }
 
-  if (response.status === 401) {
-    throw new Error(
-      "Sesi login tidak dapat dibuat. Silakan coba masuk kembali.",
-    );
-  }
-
-  if (response.status === 403) {
-    throw new Error("Akun Anda tidak memiliki akses ke Nexora Console.");
-  }
-
-  if (response.status === 429) {
-    throw new Error(
-      "Terlalu banyak permintaan. Tunggu sebentar lalu coba kembali.",
-    );
-  }
-
-  if (response.status >= 500) {
-    throw new Error(
-      "Terjadi gangguan saat memverifikasi akun. Silakan coba lagi.",
-    );
-  }
-
-  throw new Error(
-    payload?.error.message || "Status akun tidak dapat diverifikasi.",
-  );
+  return false;
 }
 
+/*
+ * Penting:
+ *
+ * POST sign-in yang sukses adalah bukti utama credential diterima dan
+ * session response telah dibuat.
+ *
+ * /api/auth/context sesudahnya hanya readiness verification.
+ *
+ * Jika seluruh verification attempt terkena transient error, fungsi ini
+ * selesai tanpa error. Browser kemudian membuka /dashboard dan security
+ * gate server-side pada dashboard menjadi final authority.
+ */
 async function waitForSignedInSession(): Promise<void> {
-  let lastError: unknown;
+  const attemptCount = SESSION_READY_DELAYS_MS.length + 1;
 
-  for (let attempt = 1; attempt <= SESSION_READY_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < attemptCount; attempt += 1) {
     try {
-      await validateSignedInAccount();
-      return;
-    } catch (error) {
-      lastError = error;
+      const ready = await validateSignedInAccount();
 
-      if (
-        error instanceof Error &&
-        (error.message.includes("tidak aktif") ||
-          error.message.includes("ditangguhkan") ||
-          error.message.includes("tidak memiliki akses"))
-      ) {
+      if (ready) {
+        return;
+      }
+    } catch (error) {
+      if (error instanceof AuthAccountRejectedError) {
         throw error;
       }
 
-      if (attempt < SESSION_READY_ATTEMPTS) {
-        await sleep(SESSION_READY_DELAY_MS);
-      }
+      /*
+       * Network failure, timeout, dan transient proxy failure tidak
+       * membatalkan sign-in yang sebelumnya sudah berhasil.
+       */
+    }
+
+    if (attempt < SESSION_READY_DELAYS_MS.length) {
+      await sleep(SESSION_READY_DELAYS_MS[attempt]);
     }
   }
 
-  if (lastError instanceof Error) {
-    throw lastError;
-  }
-
-  throw new Error("Sesi login tidak dapat dibuat. Silakan coba masuk kembali.");
+  /*
+   * Verification belum siap, tetapi sign-in sudah sukses.
+   *
+   * Jangan sign-out dan jangan tampilkan false-negative.
+   * /dashboard akan memverifikasi session melalui server component.
+   */
 }
 
 export async function signInWithEmail(
@@ -300,6 +324,12 @@ export async function signInWithEmail(
     credentials: "same-origin",
   });
 
+  /*
+   * Sign-in request sendiri tetap authoritative.
+   *
+   * Credential salah, rate limit, atau Core gagal pada POST ini tetap
+   * dianggap login failure.
+   */
   if (!response.ok) {
     throw await parseBetterAuthError(response);
   }
@@ -309,7 +339,15 @@ export async function signInWithEmail(
   try {
     await waitForSignedInSession();
   } catch (error) {
-    await clearSignInSession();
+    /*
+     * Hanya definitive account-policy rejection yang sampai ke sini.
+     * Session harus dibersihkan supaya akun inactive/suspended/forbidden
+     * tidak meninggalkan session aktif pada browser.
+     */
+    if (error instanceof AuthAccountRejectedError) {
+      await clearSignInSession();
+    }
+
     throw error;
   }
 

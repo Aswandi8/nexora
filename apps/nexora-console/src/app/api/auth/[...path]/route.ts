@@ -1,6 +1,16 @@
 import { env } from "@/config/env";
 
 const AUTH_PROXY_TIMEOUT_MS = 15_000;
+const AUTH_PROXY_GET_ATTEMPTS = 2;
+const AUTH_PROXY_RETRY_DELAY_MS = 200;
+
+const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 function createCoreAuthUrl(request: Request, path: string[]): URL {
   const requestUrl = new URL(request.url);
@@ -55,6 +65,62 @@ function copyResponseHeaders(source: Headers, target: Headers): void {
   }
 }
 
+function canRetryMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD";
+}
+
+async function fetchCoreAuth(
+  request: Request,
+  path: string[],
+  headers: Headers,
+  body: ArrayBuffer | undefined,
+): Promise<Response> {
+  const method = request.method;
+
+  const attemptCount = canRetryMethod(method) ? AUTH_PROXY_GET_ATTEMPTS : 1;
+
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attemptCount; attempt += 1) {
+    try {
+      const response = await fetch(createCoreAuthUrl(request, path), {
+        method,
+        headers,
+        body,
+        cache: "no-store",
+        redirect: "manual",
+        signal: AbortSignal.timeout(AUTH_PROXY_TIMEOUT_MS),
+      });
+
+      const shouldRetry =
+        canRetryMethod(method) &&
+        attempt < attemptCount &&
+        RETRYABLE_UPSTREAM_STATUSES.has(response.status);
+
+      if (!shouldRetry) {
+        return response;
+      }
+
+      /*
+       * GET/HEAD aman dicoba ulang ketika upstream sementara 502/503/504.
+       * Response sebelumnya tidak diteruskan karena akan digantikan retry.
+       */
+    } catch (error) {
+      lastError = error;
+
+      if (!canRetryMethod(method) || attempt >= attemptCount) {
+        throw error;
+      }
+    }
+
+    await delay(AUTH_PROXY_RETRY_DELAY_MS);
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Auth proxy request failed.");
+}
+
 async function proxyAuthRequest(
   request: Request,
   path: string[],
@@ -72,14 +138,7 @@ async function proxyAuthRequest(
       : await request.arrayBuffer();
 
   try {
-    const response = await fetch(createCoreAuthUrl(request, path), {
-      method,
-      headers,
-      body,
-      cache: "no-store",
-      redirect: "manual",
-      signal: AbortSignal.timeout(AUTH_PROXY_TIMEOUT_MS),
-    });
+    const response = await fetchCoreAuth(request, path, headers, body);
 
     const responseHeaders = new Headers();
 

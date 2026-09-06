@@ -42,6 +42,14 @@ const tests = [
     expectedStatuses: [401],
   },
   {
+    name: "Console auth proxy forwards anonymous context request",
+    url: `${CONSOLE_URL}/api/auth/context`,
+    expectedStatuses: [401],
+    expectedHeaders: {
+      "cache-control": "no-store",
+    },
+  },
+  {
     name: "Core permissions rejects anonymous request",
     url: `${CORE_URL}/api/permissions`,
     expectedStatuses: [401, 403],
@@ -173,6 +181,7 @@ async function fetchWithTimeout(url) {
 
 function normalizeBaseUrl(value) {
   const url = new URL(value);
+
   return url.toString().replace(/\/+$/, "");
 }
 
@@ -193,7 +202,9 @@ function parsePositiveInteger(value, fallback) {
 }
 
 function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function formatError(error) {
